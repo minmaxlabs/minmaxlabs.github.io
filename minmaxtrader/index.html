@@ -7,7 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <style>
     :root {
       --bg:           hsl(230, 25%,  6%);
@@ -21,7 +20,6 @@
       --primary-20:   hsla(180, 100%, 50%, 0.20);
       --primary-30:   hsla(180, 100%, 50%, 0.30);
       --accent:       hsl(280, 100%, 65%);
-      --accent-10:    hsla(280, 100%, 65%, 0.10);
       --red:          hsl(0, 84%, 60%);
       --red-10:       hsla(0, 84%, 60%, 0.10);
       --red-30:       hsla(0, 84%, 60%, 0.30);
@@ -38,7 +36,7 @@
       display: flex;
     }
 
-    /* ── Sidebar ─────────────────────────────────────────── */
+    /* ── Sidebar ── */
     .sidebar {
       display: none;
       width: 224px;
@@ -58,15 +56,11 @@
       gap: 8px;
     }
     .sidebar-logo svg { color: var(--primary); flex-shrink: 0; }
-    .logo-text {
-      font-weight: 700;
-      font-size: 15px;
-      letter-spacing: 0.12em;
-      color: var(--primary);
-    }
+    .logo-text { font-weight: 700; font-size: 15px; letter-spacing: 0.12em; color: var(--primary); }
     .logo-text span { color: var(--fg); }
 
     .sidebar-nav { flex: 1; padding: 16px 8px; display: flex; flex-direction: column; gap: 2px; }
+
     .nav-item {
       display: flex;
       align-items: center;
@@ -79,6 +73,7 @@
       cursor: pointer;
       transition: background 0.15s, color 0.15s;
       text-decoration: none;
+      user-select: none;
     }
     .nav-item:hover { background: var(--secondary); color: var(--fg); }
     .nav-item.active {
@@ -95,30 +90,15 @@
       font-size: 11px;
       color: var(--fg-muted);
     }
-    .sidebar-footer-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 4px;
-    }
-    .status-dot {
-      display: inline-flex;
-      align-items: center;
-      color: var(--primary);
-      gap: 6px;
-    }
+    .sidebar-footer-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .status-dot { display: inline-flex; align-items: center; color: var(--primary); gap: 6px; }
     .pulse {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--primary);
+      width: 8px; height: 8px; border-radius: 50%; background: var(--primary);
       animation: pulse 2s ease-in-out infinite;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-    /* ── Main ────────────────────────────────────────────── */
+    /* ── Main ── */
     .main { flex: 1; display: flex; flex-direction: column; min-height: 100vh; overflow: hidden; }
 
     .header {
@@ -133,7 +113,12 @@
       flex-shrink: 0;
     }
     .header-left { display: flex; align-items: center; gap: 12px; }
-    .header-path { display: none; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--fg-muted); }
+    .header-path {
+      display: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--fg-muted);
+    }
     @media (min-width: 768px) { .header-path { display: block; } }
 
     .mobile-logo { display: flex; align-items: center; gap: 6px; }
@@ -142,164 +127,29 @@
     .mobile-logo-text span { color: var(--fg); }
     @media (min-width: 768px) { .mobile-logo { display: none; } }
 
-    /* ── Content ─────────────────────────────────────────── */
+    .hamburger-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      color: var(--fg-muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .hamburger-btn:hover { color: var(--fg); }
+    @media (min-width: 768px) { .hamburger-btn { display: none; } }
+
+    /* NEW SIGNAL button — hidden until write is enabled */
+    .new-signal-btn { display: none; }
+
+    /* ── Content ── */
     .content { flex: 1; overflow: auto; padding: 16px; padding-bottom: 80px; }
     @media (min-width: 768px) { .content { padding: 24px; padding-bottom: 24px; } }
 
-    .feed-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .feed-title {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 20px;
-      font-weight: 700;
-    }
-    .feed-count {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      color: var(--fg-muted);
-    }
-
-    .signal-list { display: flex; flex-direction: column; gap: 8px; max-width: 896px; margin: 0 auto; }
-
-    /* ── Signal Card ─────────────────────────────────────── */
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-    }
-
-    .card-top {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-    .card-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
-
-    .ticker {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      font-size: 15px;
-      color: var(--fg);
-    }
-
-    .badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      padding: 2px 8px;
-      border-radius: 4px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-    }
-    .badge-bull { color: var(--primary); border: 1px solid var(--primary-30); background: var(--primary-10); }
-    .badge-bear { color: var(--red); border: 1px solid var(--red-30); background: var(--red-10); }
-    .badge-neu  { color: var(--fg-muted); border: 1px solid var(--border); background: var(--secondary); }
-
-    .card-date {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      color: var(--fg-muted);
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .card-source {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-bottom: 8px;
-    }
-    .source-author {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      color: var(--accent);
-    }
-    .source-platform {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      color: var(--fg-muted);
-      text-transform: uppercase;
-    }
-
-    .card-thesis {
-      font-size: 14px;
-      color: hsla(210, 40%, 98%, 0.80);
-      line-height: 1.6;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
-    .card-levels {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px solid var(--border-half);
-    }
-    .level-label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      color: var(--fg-muted);
-    }
-    .level-value { font-weight: 700; }
-    .level-entry  .level-value { color: var(--fg); }
-    .level-stop   .level-value { color: var(--red); }
-    .level-target .level-value { color: var(--primary); }
-    .level-upside-pos .level-value { color: var(--primary); }
-    .level-upside-neg .level-value { color: var(--red); }
-    .level-risk   .level-value { color: var(--red); }
-    .level-ml { margin-left: auto; }
-
-    .card-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      margin-top: 8px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      color: var(--accent);
-      text-decoration: none;
-    }
-    .card-link:hover { text-decoration: underline; }
-    .card-link svg { width: 12px; height: 12px; }
-
-    /* ── Skeletons ───────────────────────────────────────── */
-    .skeleton {
-      background: var(--secondary);
-      border-radius: 8px;
-      height: 96px;
-      animation: shimmer 1.5s ease-in-out infinite;
-    }
-    @keyframes shimmer {
-      0%, 100% { opacity: 0.5; }
-      50% { opacity: 1; }
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 48px 16px;
-      color: var(--fg-muted);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-    }
-
-    /* ── Mobile bottom nav ───────────────────────────────── */
+    /* ── Mobile bottom nav ── */
     .bottom-nav {
       display: flex;
       position: fixed;
@@ -323,27 +173,242 @@
       color: var(--fg-muted);
       text-decoration: none;
       cursor: pointer;
+      background: none;
+      border: none;
+      transition: color 0.15s;
     }
     .bottom-nav-item.active { color: var(--primary); }
     .bottom-nav-item svg { width: 20px; height: 20px; }
+
+    /* ── Mobile drawer overlay ── */
+    .drawer-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+    }
+    .drawer-overlay.open { display: flex; }
+
+    .drawer-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+    }
+    .drawer {
+      position: relative;
+      z-index: 1;
+      width: 256px;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .drawer-header {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .drawer-close {
+      background: none;
+      border: none;
+      color: var(--fg-muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s;
+    }
+    .drawer-close:hover { color: var(--fg); }
+    .drawer-nav { flex: 1; padding: 16px 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+
+    /* ── Signal cards ── */
+    .feed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .feed-title { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; }
+    .feed-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fg-muted); }
+    .signal-list { display: flex; flex-direction: column; gap: 8px; max-width: 896px; margin: 0 auto; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .card-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+    .ticker { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 15px; color: var(--fg); }
+
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .badge-bull { color: var(--primary); border: 1px solid var(--primary-30); background: var(--primary-10); }
+    .badge-bear { color: var(--red);     border: 1px solid var(--red-30);     background: var(--red-10); }
+    .badge-neu  { color: var(--fg-muted); border: 1px solid var(--border);    background: var(--secondary); }
+
+    .card-date { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--fg-muted); white-space: nowrap; flex-shrink: 0; }
+
+    .card-source { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+    .source-author { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent); }
+    .source-platform { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--fg-muted); text-transform: uppercase; }
+
+    .card-thesis {
+      font-size: 14px;
+      color: hsla(210, 40%, 98%, 0.80);
+      line-height: 1.6;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-levels {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-half);
+    }
+    .level-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--fg-muted); }
+    .level-value { font-weight: 700; }
+    .level-entry  .level-value { color: var(--fg); }
+    .level-stop   .level-value { color: var(--red); }
+    .level-target .level-value { color: var(--primary); }
+    .level-upside-pos .level-value { color: var(--primary); }
+    .level-upside-neg .level-value { color: var(--red); }
+    .level-risk   .level-value { color: var(--red); }
+    .level-ml { margin-left: auto; }
+
+    .card-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .card-link:hover { text-decoration: underline; }
+    .card-link svg { width: 12px; height: 12px; }
+
+    /* ── Skeletons ── */
+    .skeleton {
+      background: var(--secondary);
+      border-radius: 8px;
+      height: 96px;
+      animation: shimmer 1.5s ease-in-out infinite;
+    }
+    @keyframes shimmer { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+    /* ── Empty / error / stub states ── */
+    .empty-state {
+      text-align: center;
+      padding: 48px 16px;
+      color: var(--fg-muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .stub-page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 16px;
+      color: var(--fg-muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      gap: 8px;
+    }
+    .stub-page .stub-path { color: var(--primary); font-size: 16px; }
+
+    /* ── New signal form ── */
+    .new-signal-page { max-width: 560px; margin: 0 auto; }
+    .new-signal-page h1 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px;
+      font-weight: 700;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .new-signal-page h1 svg { color: var(--primary); width: 18px; height: 18px; }
+    .form-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+    .form-row { display: grid; gap: 16px; margin-bottom: 16px; }
+    .form-row.cols-2 { grid-template-columns: 1fr 1fr; }
+    .form-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .form-field { display: flex; flex-direction: column; gap: 6px; }
+    .form-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--fg-muted); letter-spacing: 0.06em; }
+    .form-input, .form-select, .form-textarea {
+      background: var(--secondary);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--fg);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      padding: 8px 10px;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: var(--primary-30);
+    }
+    .form-textarea { resize: none; min-height: 90px; }
+    .form-input.stop-field { border-color: var(--red-30); }
+    .form-actions { display: flex; gap: 12px; margin-top: 8px; }
+    .btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 5px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-outline { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+    .btn-outline:hover { background: var(--secondary); }
+    .btn-primary { background: var(--primary-10); border: 1px solid var(--primary-30); color: var(--primary); }
+    .btn-primary:hover { background: var(--primary-20); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    @media (max-width: 480px) {
+      .form-row.cols-2, .form-row.cols-3 { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
 
-  <!-- Sidebar (desktop) -->
+  <!-- Desktop sidebar -->
   <aside class="sidebar">
     <div class="sidebar-logo">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
       </svg>
-      <span class="logo-text">MinMaxTrading</span>
+      <span class="logo-text">SIGNAL<span>OS</span></span>
     </div>
-    <nav class="sidebar-nav">
-      <a class="nav-item active" href="#">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        Signals
-      </a>
-    </nav>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
     <div class="sidebar-footer">
       <div class="sidebar-footer-row">
         <span>SYS.STATUS</span>
@@ -353,56 +418,110 @@
     </div>
   </aside>
 
-  <!-- Main -->
-  <main class="main">
-    <!-- Header -->
-    <header class="header">
-      <div class="header-left">
+  <!-- Mobile drawer overlay -->
+  <div class="drawer-overlay" id="drawer-overlay">
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+    <div class="drawer">
+      <div class="drawer-header">
         <div class="mobile-logo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
           </svg>
           <span class="mobile-logo-text">SIGNAL<span>OS</span></span>
         </div>
-        <span class="header-path">&gt; /signals</span>
+        <button class="drawer-close" id="drawer-close" aria-label="Close menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
       </div>
+      <nav class="drawer-nav" id="drawer-nav"></nav>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="header">
+      <div class="header-left">
+        <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <div class="mobile-logo">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
+          </svg>
+          <span class="mobile-logo-text">SIGNAL<span>OS</span></span>
+        </div>
+        <span class="header-path" id="header-path">&gt; /signals</span>
+      </div>
+      <!-- NEW SIGNAL button: display:none until write is enabled -->
+      <button class="new-signal-btn" id="new-signal-btn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        NEW SIGNAL
+      </button>
     </header>
 
-    <!-- Content -->
     <div class="content">
-      <div class="signal-list" style="max-width:896px;margin:0 auto;">
-        <div class="feed-header">
-          <h1 style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;">Signal Feed</h1>
-          <span class="feed-count" id="signal-count">— SIGNALS</span>
-        </div>
-        <div id="feed"></div>
-      </div>
+      <div id="page"></div>
     </div>
 
-    <!-- Mobile bottom nav -->
-    <nav class="bottom-nav">
-      <a class="bottom-nav-item active" href="#">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        Signals
-      </a>
-    </nav>
+    <nav class="bottom-nav" id="bottom-nav"></nav>
   </main>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script>
+    /* ── CONFIG ── */
     const SHEET_ID = '1UfNnkX3zyhCJ42igJ98gN3i1sx_cEkwNyB9qxFXz4m0';
     const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
 
-    function sentimentBadge(sentiment) {
-      const s = (sentiment || '').toLowerCase();
-      if (s === 'bullish') return `<span class="badge badge-bull">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-        BULL</span>`;
-      if (s === 'bearish') return `<span class="badge badge-bear">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
-        BEAR</span>`;
-      return `<span class="badge badge-neu">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        NEU</span>`;
+    /* ── NAV ITEMS ── */
+    const NAV_ITEMS = [
+      {
+        hash: '#/',
+        label: 'Dashboard',
+        mobileLabel: 'Home',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
+      },
+      {
+        hash: '#/stocks',
+        label: 'Watchlist',
+        mobileLabel: 'Watch',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+      },
+      {
+        hash: '#/portfolio',
+        label: 'Portfolio',
+        mobileLabel: 'Port',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>',
+      },
+      {
+        hash: '#/signals',
+        label: 'Signals',
+        mobileLabel: 'Signals',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+      },
+      {
+        hash: '#/sources',
+        label: 'Sources',
+        mobileLabel: 'Sources',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+      },
+    ];
+
+    /* ── HELPERS ── */
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatDate(val) {
+      if (!val) return '';
+      try {
+        return new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch { return val; }
     }
 
     function formatPrice(val) {
@@ -410,12 +529,11 @@
       return isNaN(n) ? null : n;
     }
 
-    function formatDate(val) {
-      if (!val) return '';
-      try {
-        const d = new Date(val);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      } catch { return val; }
+    function sentimentBadge(sentiment) {
+      const s = (sentiment || '').toLowerCase();
+      if (s === 'bullish') return `<span class="badge badge-bull"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>BULL</span>`;
+      if (s === 'bearish') return `<span class="badge badge-bear"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>BEAR</span>`;
+      return `<span class="badge badge-neu"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>NEU</span>`;
     }
 
     function renderLevels(entry, target, stop) {
@@ -423,41 +541,24 @@
       const t = formatPrice(target);
       const s = formatPrice(stop);
       if (e == null && t == null && s == null) return '';
-
       let html = '<div class="card-levels">';
-
-      if (e != null) {
-        html += `<span class="level-label level-entry">ENTRY: <span class="level-value">$${e.toFixed(2)}</span></span>`;
-      }
-      if (s != null) {
-        html += `<span class="level-label level-stop">STOP: <span class="level-value">$${s.toFixed(2)}</span></span>`;
-      }
-      if (t != null) {
-        html += `<span class="level-label level-target">TARGET: <span class="level-value">$${t.toFixed(2)}</span></span>`;
-      }
-
+      if (e != null) html += `<span class="level-label level-entry">ENTRY: <span class="level-value">$${e.toFixed(2)}</span></span>`;
+      if (s != null) html += `<span class="level-label level-stop">STOP: <span class="level-value">$${s.toFixed(2)}</span></span>`;
+      if (t != null) html += `<span class="level-label level-target">TARGET: <span class="level-value">$${t.toFixed(2)}</span></span>`;
       if (e != null && t != null) {
         const pct = ((t - e) / e * 100).toFixed(1);
         const cls = t >= e ? 'level-upside-pos' : 'level-upside-neg';
-        const sign = t >= e ? '+' : '';
-        html += `<span class="level-label ${cls} level-ml">UPSIDE: <span class="level-value">${sign}${pct}%</span></span>`;
+        html += `<span class="level-label ${cls} level-ml">UPSIDE: <span class="level-value">${t >= e ? '+' : ''}${pct}%</span></span>`;
       }
       if (e != null && s != null) {
         const pct = ((s - e) / e * 100).toFixed(1);
         html += `<span class="level-label level-risk">RISK: <span class="level-value">${pct}%</span></span>`;
       }
-
-      html += '</div>';
-      return html;
-    }
-
-    function escapeHtml(str) {
-      return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      return html + '</div>';
     }
 
     function renderCard(row) {
       const { date, author, source, source_url, ticker, entry, target, stop_loss, sentiment, thesis } = row;
-
       return `
         <div class="card">
           <div class="card-top">
@@ -467,33 +568,26 @@
             </div>
             <span class="card-date">${formatDate(date)}</span>
           </div>
-
           <div class="card-source">
             <span class="source-author">@${escapeHtml(author)}</span>
             <span class="source-platform">· ${escapeHtml(source)}</span>
           </div>
-
           <p class="card-thesis">${escapeHtml(thesis)}</p>
-
           ${renderLevels(entry, target, stop_loss)}
-
-          ${source_url ? `
-            <a class="card-link" href="${escapeHtml(source_url)}" target="_blank" rel="noreferrer">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-              </svg>
-              SOURCE
-            </a>` : ''}
+          ${source_url ? `<a class="card-link" href="${escapeHtml(source_url)}" target="_blank" rel="noreferrer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>SOURCE</a>` : ''}
         </div>`;
     }
 
-    function showSkeletons() {
-      const feed = document.getElementById('feed');
-      feed.innerHTML = [1,2,3,4].map(() => '<div class="skeleton" style="margin-bottom:8px;"></div>').join('');
-    }
-
-    function loadSignals() {
-      showSkeletons();
+    /* ── PAGE RENDERERS ── */
+    function renderSignals() {
+      document.getElementById('page').innerHTML = `
+        <div class="signal-list">
+          <div class="feed-header">
+            <h1 class="feed-title">Signal Feed</h1>
+            <span class="feed-count" id="signal-count">— SIGNALS</span>
+          </div>
+          <div id="feed">${[1,2,3,4].map(() => '<div class="skeleton" style="margin-bottom:8px;"></div>').join('')}</div>
+        </div>`;
 
       Papa.parse(CSV_URL, {
         download: true,
@@ -502,26 +596,199 @@
         complete(results) {
           const rows = results.data.filter(r => r.ticker);
           document.getElementById('signal-count').textContent = `${rows.length} SIGNALS`;
-
           const feed = document.getElementById('feed');
-          if (rows.length === 0) {
+          if (!rows.length) {
             feed.innerHTML = '<div class="empty-state">No signals recorded.</div>';
             return;
           }
-
-          // Most recent first
           const sorted = rows.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
           feed.innerHTML = sorted.map(renderCard).join('');
         },
-        error(err) {
+        error() {
           document.getElementById('feed').innerHTML =
             '<div class="empty-state">Failed to load signals. Check sheet permissions.</div>';
-          console.error(err);
-        }
+        },
       });
     }
 
-    loadSignals();
+    function renderStubPage(path, label) {
+      document.getElementById('page').innerHTML = `
+        <div class="stub-page">
+          <span class="stub-path">&gt; /${path}</span>
+          <span>— ${label} coming soon —</span>
+        </div>`;
+    }
+
+    function renderDashboard() { renderStubPage('dashboard', 'Dashboard'); }
+    function renderWatchlist() { renderStubPage('stocks',    'Watchlist'); }
+    function renderPortfolio() { renderStubPage('portfolio', 'Portfolio'); }
+    function renderSources()   { renderStubPage('sources',   'Sources');   }
+
+    function renderNewSignal() {
+      document.getElementById('page').innerHTML = `
+        <div class="new-signal-page">
+          <h1>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+            </svg>
+            Inject New Signal
+          </h1>
+          <div class="form-card">
+            <form id="new-signal-form">
+              <div class="form-row cols-2">
+                <div class="form-field">
+                  <label class="form-label">ASSET TICKER</label>
+                  <input class="form-input" name="ticker" type="text" placeholder="e.g. NVDA" required />
+                </div>
+                <div class="form-field">
+                  <label class="form-label">AUTHOR</label>
+                  <input class="form-input" name="author" type="text" placeholder="e.g. unusual_whales" required />
+                </div>
+              </div>
+              <div class="form-row cols-2">
+                <div class="form-field">
+                  <label class="form-label">PLATFORM</label>
+                  <input class="form-input" name="source" type="text" placeholder="e.g. X or TheStreet" required />
+                </div>
+                <div class="form-field">
+                  <label class="form-label">SENTIMENT</label>
+                  <select class="form-select" name="sentiment" required>
+                    <option value="bullish">BULLISH</option>
+                    <option value="bearish">BEARISH</option>
+                    <option value="neutral">NEUTRAL</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-field">
+                  <label class="form-label">SIGNAL CONTENT</label>
+                  <textarea class="form-textarea" name="thesis" placeholder="> Enter signal content..." required></textarea>
+                </div>
+              </div>
+              <div class="form-row cols-2">
+                <div class="form-field">
+                  <label class="form-label">SOURCE URL (OPTIONAL)</label>
+                  <input class="form-input" name="source_url" type="url" placeholder="https://" />
+                </div>
+                <div class="form-field">
+                  <label class="form-label">POST TIMESTAMP</label>
+                  <input class="form-input" name="date" type="datetime-local" required />
+                </div>
+              </div>
+              <div class="form-row cols-3">
+                <div class="form-field">
+                  <label class="form-label">ENTRY ($)</label>
+                  <input class="form-input" name="entry" type="number" step="0.01" placeholder="Optional" />
+                </div>
+                <div class="form-field">
+                  <label class="form-label">STOP ($)</label>
+                  <input class="form-input stop-field" name="stop_loss" type="number" step="0.01" placeholder="Optional" />
+                </div>
+                <div class="form-field">
+                  <label class="form-label">TARGET ($)</label>
+                  <input class="form-input" name="target" type="number" step="0.01" placeholder="Optional" />
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-outline" id="abort-btn">ABORT</button>
+                <button type="submit" class="btn btn-primary" id="submit-btn">COMMIT SIGNAL</button>
+              </div>
+            </form>
+          </div>
+        </div>`;
+
+      document.getElementById('abort-btn').addEventListener('click', () => navigate('#/signals'));
+      document.getElementById('new-signal-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        btn.textContent = 'INJECTING...';
+        const data = Object.fromEntries(new FormData(e.target).entries());
+        await submitSignal(data);
+        btn.disabled = false;
+        btn.textContent = 'COMMIT SIGNAL';
+      });
+    }
+
+    /* ── WRITE STUB (auth deferred — write UI is hidden) ── */
+    async function submitSignal(data) {
+      // Stub: log to console until Sheets write auth is implemented.
+      // When ready: POST to Sheets REST API appending row in column order:
+      // date, author, source, source_url, ticker, entry, target, stop_loss, sentiment, thesis
+      // raw_text column left blank for manual entries.
+      console.log('submitSignal (stub):', data);
+      alert('Write functionality is not yet enabled.');
+    }
+
+    /* ── ROUTER ── */
+    const ROUTES = {
+      '#/':            { render: renderDashboard, path: '/dashboard',   },
+      '#/stocks':      { render: renderWatchlist, path: '/stocks',      },
+      '#/portfolio':   { render: renderPortfolio, path: '/portfolio',   },
+      '#/signals':     { render: renderSignals,   path: '/signals',     },
+      '#/sources':     { render: renderSources,   path: '/sources',     },
+      '#/signals/new': { render: renderNewSignal, path: '/signals/new', },
+    };
+
+    function navigate(hash) {
+      window.location.hash = hash;
+    }
+
+    function activeNavHash(hash) {
+      return hash.startsWith('#/signals/') ? '#/signals' : hash;
+    }
+
+    function updateNav(hash) {
+      const active = activeNavHash(hash);
+      const navHtml = NAV_ITEMS.map(item => `
+        <a class="nav-item${item.hash === active ? ' active' : ''}" href="${item.hash}">
+          ${item.icon}${item.label}
+        </a>`).join('');
+      const drawerHtml = NAV_ITEMS.map(item => `
+        <a class="nav-item${item.hash === active ? ' active' : ''}" href="${item.hash}" onclick="closeDrawer()">
+          ${item.icon}${item.label}
+        </a>`).join('');
+      const bottomHtml = NAV_ITEMS.map(item => `
+        <a class="bottom-nav-item${item.hash === active ? ' active' : ''}" href="${item.hash}">
+          ${item.icon}${item.mobileLabel}
+        </a>`).join('');
+
+      document.getElementById('sidebar-nav').innerHTML = navHtml;
+      document.getElementById('drawer-nav').innerHTML = drawerHtml;
+      document.getElementById('bottom-nav').innerHTML = bottomHtml;
+
+      const route = ROUTES[hash] || ROUTES['#/signals'];
+      document.getElementById('header-path').textContent = `> ${route.path}`;
+    }
+
+    function handleRoute() {
+      const hash = window.location.hash || '#/signals';
+      const route = ROUTES[hash] || ROUTES['#/signals'];
+      updateNav(hash);
+      route.render();
+    }
+
+    /* ── MOBILE DRAWER ── */
+    function openDrawer() {
+      document.getElementById('drawer-overlay').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeDrawer() {
+      document.getElementById('drawer-overlay').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    /* ── INIT ── */
+    document.getElementById('hamburger-btn').addEventListener('click', openDrawer);
+    document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+    document.getElementById('drawer-backdrop').addEventListener('click', closeDrawer);
+
+    window.addEventListener('hashchange', handleRoute);
+    window.addEventListener('DOMContentLoaded', () => {
+      if (!window.location.hash) window.location.hash = '#/signals';
+      handleRoute();
+    });
   </script>
 </body>
 </html>
