@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Signal Feed — MinMaxTrader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --bg:           hsl(230, 25%,  6%);
+      --card:         hsl(230, 25%,  8%);
+      --border:       hsl(230, 25%, 14%);
+      --secondary:    hsl(230, 25%, 14%);
+      --fg:           hsl(210, 40%, 98%);
+      --fg-muted:     hsl(215, 20%, 55%);
+      --primary:      hsl(180, 100%, 50%);
+      --primary-10:   hsla(180, 100%, 50%, 0.10);
+      --primary-20:   hsla(180, 100%, 50%, 0.20);
+      --primary-30:   hsla(180, 100%, 50%, 0.30);
+      --accent:       hsl(280, 100%, 65%);
+      --accent-10:    hsla(280, 100%, 65%, 0.10);
+      --red:          hsl(0, 84%, 60%);
+      --red-10:       hsla(0, 84%, 60%, 0.10);
+      --red-30:       hsla(0, 84%, 60%, 0.30);
+      --border-half:  hsla(230, 25%, 40%, 0.25);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────── */
+    .sidebar {
+      display: none;
+      width: 224px;
+      flex-shrink: 0;
+      flex-direction: column;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+    }
+    @media (min-width: 768px) { .sidebar { display: flex; } }
+
+    .sidebar-logo {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+      gap: 8px;
+    }
+    .sidebar-logo svg { color: var(--primary); flex-shrink: 0; }
+    .logo-text {
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.12em;
+      color: var(--primary);
+    }
+    .logo-text span { color: var(--fg); }
+
+    .sidebar-nav { flex: 1; padding: 16px 8px; display: flex; flex-direction: column; gap: 2px; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--fg-muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      text-decoration: none;
+    }
+    .nav-item:hover { background: var(--secondary); color: var(--fg); }
+    .nav-item.active {
+      background: var(--primary-10);
+      color: var(--primary);
+      border: 1px solid var(--primary-30);
+    }
+    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .sidebar-footer {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--fg-muted);
+    }
+    .sidebar-footer-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .status-dot {
+      display: inline-flex;
+      align-items: center;
+      color: var(--primary);
+      gap: 6px;
+    }
+    .pulse {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Main ────────────────────────────────────────────── */
+    .main { flex: 1; display: flex; flex-direction: column; min-height: 100vh; overflow: hidden; }
+
+    .header {
+      height: 56px;
+      border-bottom: 1px solid var(--border);
+      background: hsla(230, 25%, 8%, 0.5);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-path { display: none; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--fg-muted); }
+    @media (min-width: 768px) { .header-path { display: block; } }
+
+    .mobile-logo { display: flex; align-items: center; gap: 6px; }
+    .mobile-logo svg { color: var(--primary); }
+    .mobile-logo-text { font-weight: 700; font-size: 14px; letter-spacing: 0.12em; color: var(--primary); }
+    .mobile-logo-text span { color: var(--fg); }
+    @media (min-width: 768px) { .mobile-logo { display: none; } }
+
+    /* ── Content ─────────────────────────────────────────── */
+    .content { flex: 1; overflow: auto; padding: 16px; padding-bottom: 80px; }
+    @media (min-width: 768px) { .content { padding: 24px; padding-bottom: 24px; } }
+
+    .feed-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .feed-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .feed-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--fg-muted);
+    }
+
+    .signal-list { display: flex; flex-direction: column; gap: 8px; max-width: 896px; margin: 0 auto; }
+
+    /* ── Signal Card ─────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .card-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+
+    .ticker {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--fg);
+    }
+
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .badge-bull { color: var(--primary); border: 1px solid var(--primary-30); background: var(--primary-10); }
+    .badge-bear { color: var(--red); border: 1px solid var(--red-30); background: var(--red-10); }
+    .badge-neu  { color: var(--fg-muted); border: 1px solid var(--border); background: var(--secondary); }
+
+    .card-date {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--fg-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .card-source {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .source-author {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--accent);
+    }
+    .source-platform {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+    }
+
+    .card-thesis {
+      font-size: 14px;
+      color: hsla(210, 40%, 98%, 0.80);
+      line-height: 1.6;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-levels {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-half);
+    }
+    .level-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--fg-muted);
+    }
+    .level-value { font-weight: 700; }
+    .level-entry  .level-value { color: var(--fg); }
+    .level-stop   .level-value { color: var(--red); }
+    .level-target .level-value { color: var(--primary); }
+    .level-upside-pos .level-value { color: var(--primary); }
+    .level-upside-neg .level-value { color: var(--red); }
+    .level-risk   .level-value { color: var(--red); }
+    .level-ml { margin-left: auto; }
+
+    .card-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .card-link:hover { text-decoration: underline; }
+    .card-link svg { width: 12px; height: 12px; }
+
+    /* ── Skeletons ───────────────────────────────────────── */
+    .skeleton {
+      background: var(--secondary);
+      border-radius: 8px;
+      height: 96px;
+      animation: shimmer 1.5s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 16px;
+      color: var(--fg-muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    /* ── Mobile bottom nav ───────────────────────────────── */
+    .bottom-nav {
+      display: flex;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 64px;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      z-index: 40;
+    }
+    @media (min-width: 768px) { .bottom-nav { display: none; } }
+
+    .bottom-nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--fg-muted);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .bottom-nav-item.active { color: var(--primary); }
+    .bottom-nav-item svg { width: 20px; height: 20px; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar (desktop) -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
+      </svg>
+      <span class="logo-text">MinMaxTrading</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Signals
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-footer-row">
+        <span>SYS.STATUS</span>
+        <span class="status-dot"><span class="pulse"></span>ONLINE</span>
+      </div>
+      <div>V 1.0.0 // MMT</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="mobile-logo">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
+          </svg>
+          <span class="mobile-logo-text">SIGNAL<span>OS</span></span>
+        </div>
+        <span class="header-path">&gt; /signals</span>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+      <div class="signal-list" style="max-width:896px;margin:0 auto;">
+        <div class="feed-header">
+          <h1 style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;">Signal Feed</h1>
+          <span class="feed-count" id="signal-count">— SIGNALS</span>
+        </div>
+        <div id="feed"></div>
+      </div>
+    </div>
+
+    <!-- Mobile bottom nav -->
+    <nav class="bottom-nav">
+      <a class="bottom-nav-item active" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Signals
+      </a>
+    </nav>
+  </main>
+
+  <script>
+    const SHEET_ID = '1UfNnkX3zyhCJ42igJ98gN3i1sx_cEkwNyB9qxFXz4m0';
+    const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+
+    function sentimentBadge(sentiment) {
+      const s = (sentiment || '').toLowerCase();
+      if (s === 'bullish') return `<span class="badge badge-bull">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        BULL</span>`;
+      if (s === 'bearish') return `<span class="badge badge-bear">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+        BEAR</span>`;
+      return `<span class="badge badge-neu">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        NEU</span>`;
+    }
+
+    function formatPrice(val) {
+      const n = parseFloat(val);
+      return isNaN(n) ? null : n;
+    }
+
+    function formatDate(val) {
+      if (!val) return '';
+      try {
+        const d = new Date(val);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch { return val; }
+    }
+
+    function renderLevels(entry, target, stop) {
+      const e = formatPrice(entry);
+      const t = formatPrice(target);
+      const s = formatPrice(stop);
+      if (e == null && t == null && s == null) return '';
+
+      let html = '<div class="card-levels">';
+
+      if (e != null) {
+        html += `<span class="level-label level-entry">ENTRY: <span class="level-value">$${e.toFixed(2)}</span></span>`;
+      }
+      if (s != null) {
+        html += `<span class="level-label level-stop">STOP: <span class="level-value">$${s.toFixed(2)}</span></span>`;
+      }
+      if (t != null) {
+        html += `<span class="level-label level-target">TARGET: <span class="level-value">$${t.toFixed(2)}</span></span>`;
+      }
+
+      if (e != null && t != null) {
+        const pct = ((t - e) / e * 100).toFixed(1);
+        const cls = t >= e ? 'level-upside-pos' : 'level-upside-neg';
+        const sign = t >= e ? '+' : '';
+        html += `<span class="level-label ${cls} level-ml">UPSIDE: <span class="level-value">${sign}${pct}%</span></span>`;
+      }
+      if (e != null && s != null) {
+        const pct = ((s - e) / e * 100).toFixed(1);
+        html += `<span class="level-label level-risk">RISK: <span class="level-value">${pct}%</span></span>`;
+      }
+
+      html += '</div>';
+      return html;
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function renderCard(row) {
+      const { date, author, source, source_url, ticker, entry, target, stop_loss, sentiment, thesis } = row;
+
+      return `
+        <div class="card">
+          <div class="card-top">
+            <div class="card-left">
+              <span class="ticker">${escapeHtml(ticker)}</span>
+              ${sentimentBadge(sentiment)}
+            </div>
+            <span class="card-date">${formatDate(date)}</span>
+          </div>
+
+          <div class="card-source">
+            <span class="source-author">@${escapeHtml(author)}</span>
+            <span class="source-platform">· ${escapeHtml(source)}</span>
+          </div>
+
+          <p class="card-thesis">${escapeHtml(thesis)}</p>
+
+          ${renderLevels(entry, target, stop_loss)}
+
+          ${source_url ? `
+            <a class="card-link" href="${escapeHtml(source_url)}" target="_blank" rel="noreferrer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              SOURCE
+            </a>` : ''}
+        </div>`;
+    }
+
+    function showSkeletons() {
+      const feed = document.getElementById('feed');
+      feed.innerHTML = [1,2,3,4].map(() => '<div class="skeleton" style="margin-bottom:8px;"></div>').join('');
+    }
+
+    function loadSignals() {
+      showSkeletons();
+
+      Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete(results) {
+          const rows = results.data.filter(r => r.ticker);
+          document.getElementById('signal-count').textContent = `${rows.length} SIGNALS`;
+
+          const feed = document.getElementById('feed');
+          if (rows.length === 0) {
+            feed.innerHTML = '<div class="empty-state">No signals recorded.</div>';
+            return;
+          }
+
+          // Most recent first
+          const sorted = rows.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+          feed.innerHTML = sorted.map(renderCard).join('');
+        },
+        error(err) {
+          document.getElementById('feed').innerHTML =
+            '<div class="empty-state">Failed to load signals. Check sheet permissions.</div>';
+          console.error(err);
+        }
+      });
+    }
+
+    loadSignals();
+  </script>
+</body>
+</html>
