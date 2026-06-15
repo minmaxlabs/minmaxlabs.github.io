@@ -738,9 +738,9 @@
           if (isNaN(bv)) return -1;
           return (av - bv) * dir;
         }
-        // gain_loss_pct: blanks/non-numeric always last regardless of direction
-        const av = parseGainLoss(a.gain_loss_pct);
-        const bv = parseGainLoss(b.gain_loss_pct);
+        // gain_loss_pct / day_gain_loss_pct: blanks/non-numeric always last regardless of direction
+        const av = parseGainLoss(a[holdingsSortKey]);
+        const bv = parseGainLoss(b[holdingsSortKey]);
         if (av == null && bv == null) return 0;
         if (av == null) return 1;
         if (bv == null) return -1;
@@ -821,6 +821,7 @@
               <th class="sortable${activeCls('current_price')}" data-sort="current_price">CURRENT PRICE${arrow('current_price')}</th>
               <th>COST BASIS</th>
               <th class="sortable${activeCls('gain_loss_pct')}" data-sort="gain_loss_pct">GAIN/LOSS${arrow('gain_loss_pct')}</th>
+              <th class="sortable${activeCls('day_gain_loss_pct')}" data-sort="day_gain_loss_pct">DAY GAIN/LOSS${arrow('day_gain_loss_pct')}</th>
             </tr>
           </thead>
           <tbody>
@@ -830,6 +831,7 @@
                 <td class="holdings-price">${formatCurrentPrice(r.current_price)}</td>
                 <td class="holdings-cost">${formatCostBasis(r.cost_basis)}</td>
                 <td>${formatGainLossCell(r.gain_loss_pct)}</td>
+                <td>${formatGainLossCell(r.day_gain_loss_pct)}</td>
               </tr>`).join('')}
           </tbody>
         </table>`;
@@ -841,7 +843,7 @@
             holdingsSortDir = holdingsSortDir === 'asc' ? 'desc' : 'asc';
           } else {
             holdingsSortKey = key;
-            holdingsSortDir = key === 'gain_loss_pct' ? 'desc' : 'asc';
+            holdingsSortDir = (key === 'gain_loss_pct' || key === 'day_gain_loss_pct') ? 'desc' : 'asc';
           }
           renderHoldingsTable();
         });
