@@ -396,6 +396,58 @@
     @media (max-width: 480px) {
       .form-row.cols-2, .form-row.cols-3 { grid-template-columns: 1fr; }
     }
+
+    /* ── Holdings ── */
+    .holdings-page { max-width: 896px; margin: 0 auto; }
+
+    .holdings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .holdings-header .feed-title { flex-shrink: 0; }
+    .holdings-count { flex-shrink: 0; }
+
+    .holdings-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .holdings-table th,
+    .holdings-table td {
+      padding: 10px 16px;
+      text-align: left;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+    }
+    .holdings-table thead th {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--fg-muted);
+      border-bottom: 1px solid var(--border);
+      user-select: none;
+      white-space: nowrap;
+    }
+    .holdings-table tbody tr { border-top: 1px solid var(--border-half); }
+    .holdings-table tbody tr:first-child { border-top: none; }
+
+    .holdings-ticker     { color: var(--fg); font-weight: 700; }
+    .holdings-cost       { color: var(--fg); }
+    .holdings-gain-pos   { color: var(--primary); font-weight: 700; }
+    .holdings-gain-neg   { color: var(--red);     font-weight: 700; }
+    .holdings-gain-zero  { color: var(--fg); }
+    .holdings-gain-empty { color: var(--fg-muted); }
+
+    @media (max-width: 480px) {
+      .holdings-table th, .holdings-table td { padding: 8px 12px; }
+    }
   </style>
 </head>
 <body>
@@ -477,6 +529,11 @@
     /* ── CONFIG ── */
     const SHEET_ID = '1UfNnkX3zyhCJ42igJ98gN3i1sx_cEkwNyB9qxFXz4m0';
     const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+    const HOLDINGS_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Holdings`;
+
+    let holdingsRows = [];
+    let holdingsSortKey = 'ticker';
+    let holdingsSortDir = 'asc';
 
     /* ── NAV ITEMS ── */
     const NAV_ITEMS = [
@@ -621,12 +678,102 @@
 
     function renderDashboard() { renderStubPage('dashboard', 'Dashboard'); }
     function renderWatchlist() { renderStubPage('stocks',    'Watchlist'); }
+    function parseGainLoss(val) {
+      const n = parseFloat(val);
+      return isNaN(n) ? null : n;
+    }
+
+    function formatCostBasis(val) {
+      const n = parseFloat(val);
+      return isNaN(n) ? escapeHtml(val || '') : `$${n.toFixed(2)}`;
+    }
+
+    function formatGainLossCell(val) {
+      const n = parseGainLoss(val);
+      if (n == null) return '<span class="holdings-gain-empty">—</span>';
+      const pct = (n * 100).toFixed(1);
+      const sign = n > 0 ? '+' : '';
+      const cls =
+        n > 0 ? 'holdings-gain-pos' :
+        n < 0 ? 'holdings-gain-neg' :
+                'holdings-gain-zero';
+      return `<span class="${cls}">${sign}${pct}%</span>`;
+    }
+
+    function sortHoldings(rows) {
+      const dir = holdingsSortDir === 'asc' ? 1 : -1;
+      return rows.slice().sort((a, b) => {
+        if (holdingsSortKey === 'ticker') {
+          return a.ticker.localeCompare(b.ticker) * dir;
+        }
+        // gain_loss_pct: blanks/non-numeric always last regardless of direction
+        const av = parseGainLoss(a.gain_loss_pct);
+        const bv = parseGainLoss(b.gain_loss_pct);
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return (av - bv) * dir;
+      });
+    }
+
     function renderHoldings() {
       document.getElementById('page').innerHTML = `
-        <div class="stub-page">
-          <span class="stub-path">&gt; /holdings</span>
-          <span>— Holdings loading (stub) —</span>
+        <div class="holdings-page">
+          <div class="holdings-header">
+            <h1 class="feed-title">Holdings</h1>
+            <span class="feed-count holdings-count" id="holdings-count">— POSITIONS</span>
+          </div>
+          <div id="holdings-body">${[1,2,3,4].map(() => '<div class="skeleton" style="margin-bottom:8px;"></div>').join('')}</div>
         </div>`;
+
+      Papa.parse(HOLDINGS_CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete(results) {
+          holdingsRows = results.data.filter(r => r.ticker);
+          renderHoldingsTable();
+        },
+        error() {
+          document.getElementById('holdings-body').innerHTML =
+            '<div class="empty-state">Failed to load holdings. Check sheet permissions.</div>';
+        },
+      });
+    }
+
+    function renderHoldingsTable() {
+      const body = document.getElementById('holdings-body');
+      const count = document.getElementById('holdings-count');
+      const total = holdingsRows.length;
+
+      if (total === 0) {
+        body.innerHTML = '<div class="empty-state">No holdings recorded.</div>';
+        count.textContent = '0 POSITIONS';
+        return;
+      }
+
+      count.textContent = `${total} POSITIONS`;
+
+      const sorted = sortHoldings(holdingsRows);
+
+      body.innerHTML = `
+        <table class="holdings-table">
+          <thead>
+            <tr>
+              <th>TICKER</th>
+              <th>COST BASIS</th>
+              <th>GAIN/LOSS</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sorted.map(r => `
+              <tr>
+                <td class="holdings-ticker">${escapeHtml(r.ticker)}</td>
+                <td class="holdings-cost">${formatCostBasis(r.cost_basis)}</td>
+                <td>${formatGainLossCell(r.gain_loss_pct)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
     }
     function renderSources()   { renderStubPage('sources',   'Sources');   }
 
