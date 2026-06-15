@@ -435,6 +435,12 @@
       user-select: none;
       white-space: nowrap;
     }
+    .holdings-table th.sortable {
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .holdings-table th.sortable:hover { color: var(--fg); }
+    .holdings-table th.sortable.active { color: var(--primary); }
     .holdings-table tbody tr { border-top: 1px solid var(--border-half); }
     .holdings-table tbody tr:first-child { border-top: none; }
 
@@ -759,13 +765,17 @@
 
       const sorted = sortHoldings(holdingsRows);
 
+      const arrow = (key) =>
+        holdingsSortKey === key ? (holdingsSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+      const activeCls = (key) => holdingsSortKey === key ? ' active' : '';
+
       body.innerHTML = `
         <table class="holdings-table">
           <thead>
             <tr>
-              <th>TICKER</th>
+              <th class="sortable${activeCls('ticker')}" data-sort="ticker">TICKER${arrow('ticker')}</th>
               <th>COST BASIS</th>
-              <th>GAIN/LOSS</th>
+              <th class="sortable${activeCls('gain_loss_pct')}" data-sort="gain_loss_pct">GAIN/LOSS${arrow('gain_loss_pct')}</th>
             </tr>
           </thead>
           <tbody>
@@ -777,6 +787,19 @@
               </tr>`).join('')}
           </tbody>
         </table>`;
+
+      body.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.dataset.sort;
+          if (holdingsSortKey === key) {
+            holdingsSortDir = holdingsSortDir === 'asc' ? 'desc' : 'asc';
+          } else {
+            holdingsSortKey = key;
+            holdingsSortDir = key === 'gain_loss_pct' ? 'desc' : 'asc';
+          }
+          renderHoldingsTable();
+        });
+      });
     }
     function renderSources()   { renderStubPage('sources',   'Sources');   }
 
