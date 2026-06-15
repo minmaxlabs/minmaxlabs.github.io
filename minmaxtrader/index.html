@@ -750,6 +750,7 @@
         renderHoldingsTable();
       });
 
+      holdingsFilter = '';
       Papa.parse(HOLDINGS_CSV_URL, {
         download: true,
         header: true,
