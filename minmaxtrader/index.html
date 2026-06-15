@@ -765,8 +765,8 @@
       });
 
       holdingsRows    = [];
-      holdingsSortKey = 'ticker';
-      holdingsSortDir = 'asc';
+      holdingsSortKey = 'day_gain_loss_pct';
+      holdingsSortDir = 'desc';
       holdingsFilter  = '';
       Papa.parse(HOLDINGS_CSV_URL, {
         download: true,
