@@ -679,8 +679,11 @@
     function renderDashboard() { renderStubPage('dashboard', 'Dashboard'); }
     function renderWatchlist() { renderStubPage('stocks',    'Watchlist'); }
     function parseGainLoss(val) {
-      const n = parseFloat(val);
-      return isNaN(n) ? null : n;
+      if (val == null || val === '') return null;
+      const str = String(val).trim();
+      const n = parseFloat(str);
+      if (isNaN(n)) return null;
+      return str.endsWith('%') ? n : n * 100;
     }
 
     function formatCostBasis(val) {
@@ -691,7 +694,7 @@
     function formatGainLossCell(val) {
       const n = parseGainLoss(val);
       if (n == null) return '<span class="holdings-gain-empty">—</span>';
-      const pct = (n * 100).toFixed(1);
+      const pct = n.toFixed(1);
       const sign = n > 0 ? '+' : '';
       const cls =
         n > 0 ? 'holdings-gain-pos' :
