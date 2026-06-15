@@ -819,9 +819,9 @@
             <tr>
               <th class="sortable${activeCls('ticker')}" data-sort="ticker">TICKER${arrow('ticker')}</th>
               <th class="sortable${activeCls('current_price')}" data-sort="current_price">CURRENT PRICE${arrow('current_price')}</th>
+              <th class="sortable${activeCls('day_gain_loss_pct')}" data-sort="day_gain_loss_pct">DAY GAIN/LOSS${arrow('day_gain_loss_pct')}</th>
               <th>COST BASIS</th>
               <th class="sortable${activeCls('gain_loss_pct')}" data-sort="gain_loss_pct">GAIN/LOSS${arrow('gain_loss_pct')}</th>
-              <th class="sortable${activeCls('day_gain_loss_pct')}" data-sort="day_gain_loss_pct">DAY GAIN/LOSS${arrow('day_gain_loss_pct')}</th>
             </tr>
           </thead>
           <tbody>
@@ -829,9 +829,9 @@
               <tr>
                 <td class="holdings-ticker">${escapeHtml(r.ticker)}</td>
                 <td class="holdings-price">${formatCurrentPrice(r.current_price)}</td>
+                <td>${formatGainLossCell(r.day_gain_loss_pct)}</td>
                 <td class="holdings-cost">${formatCostBasis(r.cost_basis)}</td>
                 <td>${formatGainLossCell(r.gain_loss_pct)}</td>
-                <td>${formatGainLossCell(r.day_gain_loss_pct)}</td>
               </tr>`).join('')}
           </tbody>
         </table>`;
