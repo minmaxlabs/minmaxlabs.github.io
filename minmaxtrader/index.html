@@ -450,6 +450,7 @@
     .holdings-table tbody tr:first-child { border-top: none; }
 
     .holdings-ticker     { color: var(--fg); font-weight: 700; }
+    .holdings-price      { color: var(--fg); }
     .holdings-cost       { color: var(--fg); }
     .holdings-gain-pos   { color: var(--primary); font-weight: 700; }
     .holdings-gain-neg   { color: var(--red);     font-weight: 700; }
@@ -701,6 +702,11 @@
       return str.endsWith('%') ? n : n * 100;
     }
 
+    function formatCurrentPrice(val) {
+      const n = parseFloat(val);
+      return isNaN(n) ? '—' : `$${n.toFixed(2)}`;
+    }
+
     function formatCostBasis(val) {
       const n = parseFloat(val);
       return isNaN(n) ? escapeHtml(val || '') : `$${n.toFixed(2)}`;
@@ -723,6 +729,14 @@
       return rows.slice().sort((a, b) => {
         if (holdingsSortKey === 'ticker') {
           return a.ticker.localeCompare(b.ticker) * dir;
+        }
+        if (holdingsSortKey === 'current_price') {
+          const av = parseFloat(a.current_price);
+          const bv = parseFloat(b.current_price);
+          if (isNaN(av) && isNaN(bv)) return 0;
+          if (isNaN(av)) return 1;
+          if (isNaN(bv)) return -1;
+          return (av - bv) * dir;
         }
         // gain_loss_pct: blanks/non-numeric always last regardless of direction
         const av = parseGainLoss(a.gain_loss_pct);
@@ -804,6 +818,7 @@
           <thead>
             <tr>
               <th class="sortable${activeCls('ticker')}" data-sort="ticker">TICKER${arrow('ticker')}</th>
+              <th class="sortable${activeCls('current_price')}" data-sort="current_price">CURRENT PRICE${arrow('current_price')}</th>
               <th>COST BASIS</th>
               <th class="sortable${activeCls('gain_loss_pct')}" data-sort="gain_loss_pct">GAIN/LOSS${arrow('gain_loss_pct')}</th>
             </tr>
@@ -812,6 +827,7 @@
             ${sorted.map(r => `
               <tr>
                 <td class="holdings-ticker">${escapeHtml(r.ticker)}</td>
+                <td class="holdings-price">${formatCurrentPrice(r.current_price)}</td>
                 <td class="holdings-cost">${formatCostBasis(r.cost_basis)}</td>
                 <td>${formatGainLossCell(r.gain_loss_pct)}</td>
               </tr>`).join('')}
