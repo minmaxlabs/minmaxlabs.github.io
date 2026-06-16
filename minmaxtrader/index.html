@@ -545,11 +545,17 @@
     const SHEET_ID = '1UfNnkX3zyhCJ42igJ98gN3i1sx_cEkwNyB9qxFXz4m0';
     const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
     const HOLDINGS_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Holdings`;
+    const TRANSACTIONS_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Transactions`;
 
     let holdingsRows = [];
     let holdingsSortKey = 'ticker';
     let holdingsSortDir = 'asc';
     let holdingsFilter = '';
+
+    let transactionsRows = [];
+    let transactionsSortKey = 'date';
+    let transactionsSortDir = 'desc';
+    let transactionsFilter = '';
 
     /* ── NAV ITEMS ── */
     const NAV_ITEMS = [
@@ -560,10 +566,16 @@
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
       },
       {
+        hash: '#/signals',
+        label: 'Signals',
+        mobileLabel: 'Signals',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+      },
+      {
         hash: '#/stocks',
         label: 'Watchlist',
         mobileLabel: 'Watch',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 2a10 10 0 0 0-10 10"/><path d="M12 22a10 10 0 0 0 10-10"/><path d="M12 22a10 10 0 0 1-10-10"/></svg>',
       },
       {
         hash: '#/holdings',
@@ -572,16 +584,10 @@
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>',
       },
       {
-        hash: '#/signals',
-        label: 'Signals',
-        mobileLabel: 'Signals',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
-      },
-      {
-        hash: '#/sources',
-        label: 'Sources',
-        mobileLabel: 'Sources',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+        hash: '#/transactions',
+        label: 'Transactions',
+        mobileLabel: 'Txns',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
       },
     ];
 
@@ -849,7 +855,125 @@
         });
       });
     }
-    function renderSources()   { renderStubPage('sources',   'Sources');   }
+    function sortTransactions(rows) {
+      const dir = transactionsSortDir === 'asc' ? 1 : -1;
+      return rows.slice().sort((a, b) => {
+        if (transactionsSortKey === 'ticker') return a.ticker.localeCompare(b.ticker) * dir;
+        if (transactionsSortKey === 'type')   return a.type.localeCompare(b.type) * dir;
+        if (transactionsSortKey === 'price') {
+          return (parseFloat(a.price) - parseFloat(b.price)) * dir;
+        }
+        // date
+        return a.date.localeCompare(b.date) * dir;
+      });
+    }
+
+    function renderTransactions() {
+      document.getElementById('page').innerHTML = `
+        <div class="holdings-page">
+          <div class="holdings-header">
+            <h1 class="feed-title">Transactions</h1>
+            <input class="form-input holdings-search" id="txn-search" type="text" placeholder="search ticker…" autocomplete="off" />
+            <span class="feed-count holdings-count" id="txn-count">— TRANSACTIONS</span>
+          </div>
+          <div id="txn-body">${[1,2,3,4].map(() => '<div class="skeleton" style="margin-bottom:8px;"></div>').join('')}</div>
+        </div>`;
+
+      document.getElementById('txn-search').addEventListener('input', (e) => {
+        transactionsFilter = e.target.value.trim().toLowerCase();
+        renderTransactionsTable();
+      });
+
+      transactionsRows    = [];
+      transactionsSortKey = 'date';
+      transactionsSortDir = 'desc';
+      transactionsFilter  = '';
+
+      Papa.parse(TRANSACTIONS_CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete(results) {
+          transactionsRows = results.data.filter(r => r.ticker);
+          renderTransactionsTable();
+        },
+        error() {
+          document.getElementById('txn-body').innerHTML =
+            '<div class="empty-state">Failed to load transactions. Check sheet permissions.</div>';
+        },
+      });
+    }
+
+    function renderTransactionsTable() {
+      const body  = document.getElementById('txn-body');
+      const count = document.getElementById('txn-count');
+      const total = transactionsRows.length;
+
+      if (total === 0) {
+        body.innerHTML = '<div class="empty-state">No transactions recorded.</div>';
+        count.textContent = '0 TRANSACTIONS';
+        return;
+      }
+
+      const filtered = transactionsFilter
+        ? transactionsRows.filter(r => r.ticker.toLowerCase().includes(transactionsFilter))
+        : transactionsRows;
+
+      count.textContent = transactionsFilter
+        ? `${filtered.length} OF ${total} TRANSACTIONS`
+        : `${total} TRANSACTIONS`;
+
+      if (filtered.length === 0) {
+        body.innerHTML = '<div class="empty-state">No matching tickers.</div>';
+        return;
+      }
+
+      const sorted = sortTransactions(filtered);
+
+      const arrow = (key) => transactionsSortKey === key ? (transactionsSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+      const activeCls = (key) => transactionsSortKey === key ? ' active' : '';
+
+      const typeBadge = (type) => {
+        const t = (type || '').toLowerCase();
+        if (t === 'buy')  return `<span class="badge badge-bull">BUY</span>`;
+        if (t === 'sell') return `<span class="badge badge-bear">SELL</span>`;
+        return `<span class="badge badge-neu">${escapeHtml(type)}</span>`;
+      };
+
+      body.innerHTML = `
+        <table class="holdings-table">
+          <thead>
+            <tr>
+              <th class="sortable${activeCls('date')}"   data-sort="date">DATE${arrow('date')}</th>
+              <th class="sortable${activeCls('ticker')}" data-sort="ticker">TICKER${arrow('ticker')}</th>
+              <th class="sortable${activeCls('price')}"  data-sort="price">PRICE${arrow('price')}</th>
+              <th class="sortable${activeCls('type')}"   data-sort="type">TYPE${arrow('type')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sorted.map(r => `
+              <tr>
+                <td class="holdings-cost">${escapeHtml(formatDate(r.date))}</td>
+                <td class="holdings-ticker">${escapeHtml(r.ticker)}</td>
+                <td class="holdings-price">${isNaN(parseFloat(r.price)) ? '—' : `$${parseFloat(r.price).toFixed(2)}`}</td>
+                <td>${typeBadge(r.type)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+
+      body.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.dataset.sort;
+          if (transactionsSortKey === key) {
+            transactionsSortDir = transactionsSortDir === 'asc' ? 'desc' : 'asc';
+          } else {
+            transactionsSortKey = key;
+            transactionsSortDir = key === 'date' ? 'desc' : 'asc';
+          }
+          renderTransactionsTable();
+        });
+      });
+    }
 
     function renderNewSignal() {
       document.getElementById('page').innerHTML = `
@@ -949,12 +1073,12 @@
 
     /* ── ROUTER ── */
     const ROUTES = {
-      '#/':            { render: renderDashboard, path: '/dashboard',   },
-      '#/stocks':      { render: renderWatchlist, path: '/stocks',      },
-      '#/holdings':    { render: renderHoldings,  path: '/holdings',    },
-      '#/signals':     { render: renderSignals,   path: '/signals',     },
-      '#/sources':     { render: renderSources,   path: '/sources',     },
-      '#/signals/new': { render: renderNewSignal, path: '/signals/new', },
+      '#/':             { render: renderDashboard,    path: '/dashboard',      },
+      '#/signals':      { render: renderSignals,      path: '/signals',        },
+      '#/stocks':       { render: renderWatchlist,    path: '/stocks',         },
+      '#/holdings':     { render: renderHoldings,     path: '/holdings',       },
+      '#/transactions': { render: renderTransactions, path: '/transactions',   },
+      '#/signals/new':  { render: renderNewSignal,    path: '/signals/new',    },
     };
 
     function navigate(hash) {
