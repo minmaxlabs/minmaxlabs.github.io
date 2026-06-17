@@ -540,6 +540,29 @@
     .mover-pct-pos { font-weight: 700; color: var(--primary); }
     .mover-pct-neg { font-weight: 700; color: var(--red); }
 
+    /* ── Ticker links ── */
+    .ticker-link { color: inherit; text-decoration: none; cursor: pointer; }
+    .ticker-link:hover { opacity: 0.75; }
+
+    /* ── Stock detail page ── */
+    .stock-page { max-width: 896px; margin: 0 auto; }
+    .stock-page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .stock-back-btn {
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      color: var(--fg-muted); font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      padding: 6px 12px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    }
+    .stock-back-btn:hover { color: var(--fg); border-color: var(--fg-muted); }
+    .stock-ticker-heading { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--primary); }
+    .stock-chart-container {
+      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+      overflow: hidden; height: 460px; margin-bottom: 28px;
+    }
+    .stock-signals-header {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+      letter-spacing: 0.1em; color: var(--fg-muted); margin-bottom: 12px;
+    }
+
     /* ── Login screen ── */
     .login-screen {
       position: fixed;
@@ -877,13 +900,13 @@
         <div class="card">
           <div class="card-top">
             <div class="card-left">
-              <span class="ticker">${escapeHtml(ticker)}</span>
+              <a class="ticker ticker-link" href="#/stock/${encodeURIComponent(ticker)}">${escapeHtml(ticker)}</a>
               ${sentimentBadge(sentiment)}
             </div>
             <span class="card-date">${formatDate(date)}</span>
           </div>
           <div class="card-source">
-            <span class="source-author">@${escapeHtml(author)}</span>
+            <a class="source-author ticker-link" href="#/author/${encodeURIComponent(author)}">@${escapeHtml(author)}</a>
             <span class="source-platform">· ${escapeHtml(source)}</span>
           </div>
           <p class="card-thesis">${escapeHtml(thesis)}</p>
@@ -1046,7 +1069,7 @@
       const moverRow = (r, pos) => {
         const sign = r.g > 0 ? '+' : '';
         const cls  = pos ? 'mover-pct-pos' : 'mover-pct-neg';
-        return `<div class="mover-row"><span class="mover-ticker">${escapeHtml(r.ticker)}</span><span class="${cls}">${sign}${r.g.toFixed(2)}%</span></div>`;
+        return `<div class="mover-row"><a class="mover-ticker ticker-link" href="#/stock/${encodeURIComponent(r.ticker)}">${escapeHtml(r.ticker)}</a><span class="${cls}">${sign}${r.g.toFixed(2)}%</span></div>`;
       };
       const noData = '<div class="mover-row" style="color:var(--fg-muted);font-size:12px;">None today</div>';
 
@@ -1095,12 +1118,129 @@
             ${recent.map(r => `
               <tr>
                 <td class="holdings-cost">${escapeHtml(formatDate(r.date))}</td>
-                <td class="holdings-ticker">${escapeHtml(r.ticker)}</td>
+                <td class="holdings-ticker"><a class="ticker-link" href="#/stock/${encodeURIComponent(r.ticker)}">${escapeHtml(r.ticker)}</a></td>
                 <td class="holdings-price">${isNaN(parseFloat(r.price)) ? '—' : `$${parseFloat(r.price).toFixed(2)}`}</td>
                 <td>${typeBadge(r.type)}</td>
               </tr>`).join('')}
           </tbody>
         </table>`;
+    }
+
+    /* ── STOCK DETAIL ── */
+    let _tvScriptEl = null;
+
+    function renderStock(ticker) {
+      const safeTicker = escapeHtml(ticker);
+      const chartId = 'tv-chart-' + ticker.replace(/[^A-Za-z0-9]/g, '_');
+
+      document.getElementById('page').innerHTML = `
+        <div class="stock-page">
+          <div class="stock-page-header">
+            <button class="stock-back-btn" id="stock-back-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>BACK
+            </button>
+            <span class="stock-ticker-heading">${safeTicker}</span>
+          </div>
+          <div class="stock-chart-container" id="${chartId}"></div>
+          <div class="stock-signals-header">SIGNALS FOR ${safeTicker}</div>
+          <div id="stock-signals-list">
+            ${[1,2,3].map(() => '<div class="skeleton" style="margin-bottom:8px;height:88px;"></div>').join('')}
+          </div>
+        </div>`;
+
+      document.getElementById('stock-back-btn').addEventListener('click', () => {
+        if (history.length > 1) history.back(); else navigate('#/signals');
+      });
+
+      _injectTradingViewWidget(chartId, ticker);
+
+      Papa.parse(CSV_URL, {
+        download: true, header: true, skipEmptyLines: true,
+        complete(results) {
+          const el = document.getElementById('stock-signals-list');
+          if (!el) return;
+          const rows = results.data
+            .filter(r => r.ticker && r.ticker.toUpperCase() === ticker.toUpperCase())
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+          el.innerHTML = rows.length
+            ? rows.map(renderCard).join('')
+            : `<div class="empty-state">No signals recorded for ${safeTicker}.</div>`;
+        },
+        error() {
+          const el = document.getElementById('stock-signals-list');
+          if (el) el.innerHTML = '<div class="empty-state">Failed to load signals.</div>';
+        },
+      });
+    }
+
+    function _injectTradingViewWidget(containerId, ticker) {
+      if (_tvScriptEl && _tvScriptEl.parentNode) {
+        _tvScriptEl.parentNode.removeChild(_tvScriptEl);
+        _tvScriptEl = null;
+      }
+      const initWidget = () => {
+        if (!document.getElementById(containerId)) return;
+        new TradingView.widget({ // eslint-disable-line no-undef
+          container_id: containerId, symbol: ticker,
+          interval: 'D', timezone: 'America/New_York',
+          theme: 'dark', style: '1', locale: 'en',
+          toolbar_bg: '#0a0c16',
+          enable_publishing: false, hide_side_toolbar: false,
+          allow_symbol_change: true, width: '100%', height: 460, autosize: false,
+        });
+      };
+      const script = document.createElement('script');
+      script.src = 'https://s3.tradingview.com/tv.js';
+      script.async = true;
+      script.onload = initWidget;
+      document.body.appendChild(script);
+      _tvScriptEl = script;
+      if (window.TradingView) initWidget();
+    }
+
+    /* ── AUTHOR DETAIL ── */
+    function renderAuthor(author) {
+      const safeAuthor = escapeHtml(author);
+
+      document.getElementById('page').innerHTML = `
+        <div class="stock-page">
+          <div class="stock-page-header">
+            <button class="stock-back-btn" id="author-back-btn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>BACK
+            </button>
+            <span class="stock-ticker-heading">@${safeAuthor}</span>
+          </div>
+          <div class="stock-signals-header">SIGNALS FROM @${safeAuthor}</div>
+          <div id="author-signals-list">
+            ${[1,2,3].map(() => '<div class="skeleton" style="margin-bottom:8px;height:88px;"></div>').join('')}
+          </div>
+        </div>`;
+
+      document.getElementById('author-back-btn').addEventListener('click', () => {
+        if (history.length > 1) history.back(); else navigate('#/signals');
+      });
+
+      Papa.parse(CSV_URL, {
+        download: true, header: true, skipEmptyLines: true,
+        complete(results) {
+          const el = document.getElementById('author-signals-list');
+          if (!el) return;
+          const rows = results.data
+            .filter(r => r.author && r.author.toLowerCase() === author.toLowerCase())
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+          el.innerHTML = rows.length
+            ? rows.map(renderCard).join('')
+            : `<div class="empty-state">No signals from @${safeAuthor}.</div>`;
+        },
+        error() {
+          const el = document.getElementById('author-signals-list');
+          if (el) el.innerHTML = '<div class="empty-state">Failed to load signals.</div>';
+        },
+      });
     }
 
     function renderWatchlist() { renderStubPage('stocks',    'Watchlist'); }
@@ -1237,7 +1377,7 @@
           <tbody>
             ${sorted.map(r => `
               <tr>
-                <td class="holdings-ticker">${escapeHtml(r.ticker)}</td>
+                <td class="holdings-ticker"><a class="ticker-link" href="#/stock/${encodeURIComponent(r.ticker)}">${escapeHtml(r.ticker)}</a></td>
                 <td class="holdings-price">${formatCurrentPrice(r.current_price)}</td>
                 <td>${formatGainLossCell(r.day_gain_loss_pct)}</td>
                 <td class="holdings-cost">${formatCostBasis(r.cost_basis)}</td>
@@ -1358,7 +1498,7 @@
             ${sorted.map(r => `
               <tr>
                 <td class="holdings-cost">${escapeHtml(formatDate(r.date))}</td>
-                <td class="holdings-ticker">${escapeHtml(r.ticker)}</td>
+                <td class="holdings-ticker"><a class="ticker-link" href="#/stock/${encodeURIComponent(r.ticker)}">${escapeHtml(r.ticker)}</a></td>
                 <td class="holdings-price">${isNaN(parseFloat(r.price)) ? '—' : `$${parseFloat(r.price).toFixed(2)}`}</td>
                 <td>${typeBadge(r.type)}</td>
               </tr>`).join('')}
@@ -1490,7 +1630,10 @@
     }
 
     function activeNavHash(hash) {
-      return hash.startsWith('#/signals/') ? '#/signals' : hash;
+      if (hash.startsWith('#/signals/')) return '#/signals';
+      if (hash.startsWith('#/stock/'))   return null;
+      if (hash.startsWith('#/author/'))  return null;
+      return hash;
     }
 
     function updateNav(hash) {
@@ -1512,14 +1655,32 @@
       document.getElementById('drawer-nav').innerHTML = drawerHtml;
       document.getElementById('bottom-nav').innerHTML = bottomHtml;
 
-      const route = ROUTES[hash] || ROUTES['#/'];
-      document.getElementById('header-path').textContent = `> ${route.path}`;
+      if (hash.startsWith('#/stock/')) {
+        const t = decodeURIComponent(hash.replace('#/stock/', ''));
+        document.getElementById('header-path').textContent = `> /stock/${t}`;
+      } else if (hash.startsWith('#/author/')) {
+        const a = decodeURIComponent(hash.replace('#/author/', ''));
+        document.getElementById('header-path').textContent = `> /author/@${a}`;
+      } else {
+        const route = ROUTES[hash] || ROUTES['#/'];
+        document.getElementById('header-path').textContent = `> ${route.path}`;
+      }
     }
 
     function handleRoute() {
       const hash = window.location.hash || '#/';
-      const route = ROUTES[hash] || ROUTES['#/'];
       updateNav(hash);
+      if (hash.startsWith('#/stock/')) {
+        const ticker = decodeURIComponent(hash.replace('#/stock/', ''));
+        if (ticker) { renderStock(ticker); return; }
+        ROUTES['#/'].render(); return;
+      }
+      if (hash.startsWith('#/author/')) {
+        const author = decodeURIComponent(hash.replace('#/author/', ''));
+        if (author) { renderAuthor(author); return; }
+        ROUTES['#/'].render(); return;
+      }
+      const route = ROUTES[hash] || ROUTES['#/'];
       route.render();
     }
 
