@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  <script id="gsi-script" src="https://accounts.google.com/gsi/client" async></script>
   <style>
     :root {
       --bg:           hsl(230, 25%,  6%);
@@ -537,9 +538,92 @@
     .mover-ticker { font-weight: 700; color: var(--fg); }
     .mover-pct-pos { font-weight: 700; color: var(--primary); }
     .mover-pct-neg { font-weight: 700; color: var(--red); }
+
+    /* ── Login screen ── */
+    .login-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .login-screen.hidden { display: none; }
+    .login-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px 32px;
+      width: 100%;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .login-logo { color: var(--primary); margin-bottom: 16px; }
+    .login-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+    .login-subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--fg-muted);
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .login-divider { width: 100%; height: 1px; background: var(--border); margin-bottom: 28px; }
+    .login-error {
+      display: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--red);
+      text-align: center;
+      padding: 8px 12px;
+      background: var(--red-10);
+      border: 1px solid var(--red-30);
+      border-radius: 4px;
+      width: 100%;
+      margin-top: 16px;
+    }
+    .login-error.visible { display: block; }
+
+    /* ── Logout button ── */
+    .logout-btn {
+      background: none;
+      border: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--fg-muted);
+      cursor: pointer;
+      padding: 0;
+      transition: color 0.15s;
+    }
+    .logout-btn:hover { color: var(--red); }
   </style>
 </head>
 <body>
+
+  <!-- Login screen -->
+  <div class="login-screen" id="login-screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
+        </svg>
+      </div>
+      <div class="login-title">MinMaxTrader</div>
+      <div class="login-subtitle">Sign in to access your trading dashboard</div>
+      <div class="login-divider"></div>
+      <div id="google-signin-btn"></div>
+    </div>
+  </div>
 
   <!-- Desktop sidebar -->
   <aside class="sidebar">
@@ -555,7 +639,11 @@
         <span>SYS.STATUS</span>
         <span class="status-dot"><span class="pulse"></span>ONLINE</span>
       </div>
-      <div>V 1.0.0 // MMT</div>
+      <div class="sidebar-footer-row" style="margin-top:4px;">
+        <div>V 1.0.0 // MMT</div>
+        <button class="logout-btn" onclick="signOut()">SIGN OUT</button>
+      </div>
+      <div id="sidebar-user" style="margin-top:4px;font-size:10px;color:var(--fg-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
     </div>
   </aside>
 
@@ -615,6 +703,85 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script>
+    /* ── AUTH CONFIG ── */
+    // Create a Client ID at: https://console.cloud.google.com/apis/credentials
+    // Add your GitHub Pages origin to "Authorized JavaScript origins".
+    const GOOGLE_CLIENT_ID = '21043724365-9r9ma8rbb3pgssn6i0c77cljl1tb021o.apps.googleusercontent.com';
+    let currentUser = null;
+
+    function decodeJwt(token) {
+      const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(b64));
+    }
+
+    function showLoginScreen() {
+      document.getElementById('login-screen').classList.remove('hidden');
+    }
+
+    function hideLoginScreen() {
+      document.getElementById('login-screen').classList.add('hidden');
+    }
+
+    function onGoogleSignIn(response) {
+      const payload = decodeJwt(response.credential);
+      currentUser = { email: payload.email, name: payload.name, picture: payload.picture };
+      sessionStorage.setItem('mmt_user', JSON.stringify(currentUser));
+      hideLoginScreen();
+      updateSidebarUser();
+      window.location.hash = '#/';
+      handleRoute();
+    }
+
+    function setupGoogleSignIn() {
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: onGoogleSignIn,
+        auto_select: true,
+      });
+      google.accounts.id.renderButton(
+        document.getElementById('google-signin-btn'),
+        { theme: 'filled_black', size: 'large', width: 280 }
+      );
+      google.accounts.id.prompt();
+    }
+
+    function initAuth() {
+      const stored = sessionStorage.getItem('mmt_user');
+      if (stored) {
+        try {
+          currentUser = JSON.parse(stored);
+          hideLoginScreen();
+          updateSidebarUser();
+          handleRoute();
+          return;
+        } catch {
+          sessionStorage.removeItem('mmt_user');
+        }
+      }
+      showLoginScreen();
+      const gsiScript = document.getElementById('gsi-script');
+      if (typeof google !== 'undefined') {
+        setupGoogleSignIn();
+      } else {
+        gsiScript.addEventListener('load', setupGoogleSignIn);
+      }
+    }
+
+    function signOut() {
+      sessionStorage.removeItem('mmt_user');
+      currentUser = null;
+      if (typeof google !== 'undefined') google.accounts.id.disableAutoSelect();
+      updateSidebarUser();
+      document.getElementById('google-signin-btn').innerHTML = '';
+      showLoginScreen();
+      if (typeof google !== 'undefined') setupGoogleSignIn();
+    }
+
+    function updateSidebarUser() {
+      const el = document.getElementById('sidebar-user');
+      if (el) el.textContent = currentUser ? currentUser.email : '';
+    }
+
     /* ── CONFIG ── */
     const SHEET_ID = '1UfNnkX3zyhCJ42igJ98gN3i1sx_cEkwNyB9qxFXz4m0';
     const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
@@ -1352,13 +1519,13 @@
       document.getElementById('drawer-nav').innerHTML = drawerHtml;
       document.getElementById('bottom-nav').innerHTML = bottomHtml;
 
-      const route = ROUTES[hash] || ROUTES['#/signals'];
+      const route = ROUTES[hash] || ROUTES['#/'];
       document.getElementById('header-path').textContent = `> ${route.path}`;
     }
 
     function handleRoute() {
-      const hash = window.location.hash || '#/signals';
-      const route = ROUTES[hash] || ROUTES['#/signals'];
+      const hash = window.location.hash || '#/';
+      const route = ROUTES[hash] || ROUTES['#/'];
       updateNav(hash);
       route.render();
     }
@@ -1379,10 +1546,10 @@
     document.getElementById('drawer-close').addEventListener('click', closeDrawer);
     document.getElementById('drawer-backdrop').addEventListener('click', closeDrawer);
 
-    window.addEventListener('hashchange', handleRoute);
+    window.addEventListener('hashchange', () => { if (currentUser) handleRoute(); });
     window.addEventListener('DOMContentLoaded', () => {
-      if (!window.location.hash) window.location.hash = '#/signals';
-      handleRoute();
+      if (!window.location.hash) window.location.hash = '#/';
+      initAuth();
     });
   </script>
 </body>
