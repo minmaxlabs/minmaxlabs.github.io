@@ -286,6 +286,7 @@
     }
     .level-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--fg-muted); }
     .level-value { font-weight: 700; }
+    .level-price  .level-value { color: var(--fg); }
     .level-entry  .level-value { color: var(--fg); }
     .level-stop   .level-value { color: var(--red); }
     .level-target .level-value { color: var(--primary); }
@@ -615,29 +616,33 @@
       return `<span class="badge badge-neu"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>NEU</span>`;
     }
 
-    function renderLevels(entry, target, stop) {
-      const e = formatPrice(entry);
-      const t = formatPrice(target);
-      const s = formatPrice(stop);
-      if (e == null && t == null && s == null) return '';
+    function renderLevels(row) {
+      const price = formatPrice(row.current_price);
+      const e = formatPrice(row.entry);
+      const t = formatPrice(row.target);
+      const s = formatPrice(row.stop_loss);
+      const u = formatPrice(row.upside);
+      const r = formatPrice(row.risk);
+      if (price == null && e == null && t == null && s == null) return '';
       let html = '<div class="card-levels">';
+      if (price != null) html += `<span class="level-label level-price">PRICE: <span class="level-value">$${price.toFixed(2)}</span></span>`;
       if (e != null) html += `<span class="level-label level-entry">ENTRY: <span class="level-value">$${e.toFixed(2)}</span></span>`;
       if (s != null) html += `<span class="level-label level-stop">STOP: <span class="level-value">$${s.toFixed(2)}</span></span>`;
       if (t != null) html += `<span class="level-label level-target">TARGET: <span class="level-value">$${t.toFixed(2)}</span></span>`;
-      if (e != null && t != null) {
-        const pct = ((t - e) / e * 100).toFixed(1);
-        const cls = t >= e ? 'level-upside-pos' : 'level-upside-neg';
-        html += `<span class="level-label ${cls} level-ml">UPSIDE: <span class="level-value">${t >= e ? '+' : ''}${pct}%</span></span>`;
+      if (u != null) {
+        const pct = (u * 100).toFixed(1);
+        const cls = u >= 0 ? 'level-upside-pos' : 'level-upside-neg';
+        html += `<span class="level-label ${cls} level-ml">UPSIDE: <span class="level-value">${u >= 0 ? '+' : ''}${pct}%</span></span>`;
       }
-      if (e != null && s != null) {
-        const pct = ((s - e) / e * 100).toFixed(1);
+      if (r != null) {
+        const pct = (r * 100).toFixed(1);
         html += `<span class="level-label level-risk">RISK: <span class="level-value">${pct}%</span></span>`;
       }
       return html + '</div>';
     }
 
     function renderCard(row) {
-      const { date, author, source, source_url, ticker, entry, target, stop_loss, sentiment, thesis } = row;
+      const { date, author, source, source_url, ticker, sentiment, thesis } = row;
       return `
         <div class="card">
           <div class="card-top">
@@ -652,7 +657,7 @@
             <span class="source-platform">· ${escapeHtml(source)}</span>
           </div>
           <p class="card-thesis">${escapeHtml(thesis)}</p>
-          ${renderLevels(entry, target, stop_loss)}
+          ${renderLevels(row)}
           ${source_url ? `<a class="card-link" href="${escapeHtml(source_url)}" target="_blank" rel="noreferrer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>SOURCE</a>` : ''}
         </div>`;
     }
