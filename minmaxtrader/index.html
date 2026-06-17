@@ -466,6 +466,77 @@
       .holdings-count  { text-align: right; }
       .holdings-table th, .holdings-table td { padding: 8px 12px; }
     }
+
+    /* ── Dashboard ── */
+    .dashboard-page { max-width: 896px; margin: 0 auto; }
+    .dash-section-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--fg-muted);
+      margin-bottom: 10px;
+    }
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    @media (max-width: 600px) { .stat-grid { grid-template-columns: 1fr; } }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .stat-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--fg-muted);
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+    .stat-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--fg);
+    }
+    .stat-value.positive { color: var(--primary); }
+    .stat-value.negative { color: var(--red); }
+    .stat-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--fg-muted);
+      margin-top: 6px;
+    }
+    .movers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 480px) { .movers-grid { grid-template-columns: 1fr; } }
+    .movers-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .movers-card-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .movers-card-title.gainers { color: var(--primary); }
+    .movers-card-title.losers  { color: var(--red); }
+    .mover-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-half);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+    }
+    .mover-row:last-child { border-bottom: none; }
+    .mover-ticker { font-weight: 700; color: var(--fg); }
+    .mover-pct-pos { font-weight: 700; color: var(--primary); }
+    .mover-pct-neg { font-weight: 700; color: var(--red); }
   </style>
 </head>
 <body>
@@ -661,6 +732,19 @@
         </div>`;
     }
 
+    /* ── CSV HELPER ── */
+    function fetchCsv(url) {
+      return new Promise((resolve, reject) => {
+        Papa.parse(url, {
+          download: true,
+          header: true,
+          skipEmptyLines: true,
+          complete: r => resolve(r.data),
+          error: reject,
+        });
+      });
+    }
+
     /* ── PAGE RENDERERS ── */
     function renderSignals() {
       document.getElementById('page').innerHTML = `
@@ -702,7 +786,163 @@
         </div>`;
     }
 
-    function renderDashboard() { renderStubPage('dashboard', 'Dashboard'); }
+    function renderDashboard() {
+      const skel = (n, h = 88) =>
+        Array.from({length: n}, () => `<div class="skeleton" style="height:${h}px;"></div>`).join('');
+
+      document.getElementById('page').innerHTML = `
+        <div class="dashboard-page">
+          <div class="feed-header">
+            <h1 class="feed-title">Dashboard</h1>
+          </div>
+
+          <div class="dash-section-title">PORTFOLIO SNAPSHOT</div>
+          <div id="dash-snapshot" class="stat-grid" style="margin-bottom:28px;">${skel(3)}</div>
+
+          <div class="dash-section-title">TOP MOVERS TODAY</div>
+          <div id="dash-movers" class="movers-grid" style="margin-bottom:28px;">
+            <div class="skeleton" style="height:148px;"></div>
+            <div class="skeleton" style="height:148px;"></div>
+          </div>
+
+          <div class="dash-section-title">RECENT SIGNALS</div>
+          <div id="dash-signals" style="display:flex;flex-direction:column;gap:12px;margin-bottom:28px;">${skel(5)}</div>
+
+          <div class="dash-section-title">RECENT TRANSACTIONS</div>
+          <div id="dash-txns" style="margin-bottom:28px;">
+            <div class="skeleton" style="height:148px;"></div>
+          </div>
+        </div>`;
+
+      fetchCsv(HOLDINGS_CSV_URL).then(data => {
+        const rows = data.filter(r => r.ticker);
+        renderDashSnapshot(rows);
+        renderDashMovers(rows);
+      }).catch(() => {
+        const snap = document.getElementById('dash-snapshot');
+        const mov  = document.getElementById('dash-movers');
+        if (snap) snap.innerHTML = '<div class="empty-state">Failed to load holdings.</div>';
+        if (mov)  mov.innerHTML  = '';
+      });
+
+      fetchCsv(CSV_URL).then(data => {
+        renderDashSignals(data.filter(r => r.ticker));
+      }).catch(() => {
+        const el = document.getElementById('dash-signals');
+        if (el) el.innerHTML = '<div class="empty-state">Failed to load signals.</div>';
+      });
+
+      fetchCsv(TRANSACTIONS_CSV_URL).then(data => {
+        renderDashTxns(data.filter(r => r.ticker));
+      }).catch(() => {
+        const el = document.getElementById('dash-txns');
+        if (el) el.innerHTML = '<div class="empty-state">Failed to load transactions.</div>';
+      });
+    }
+
+    function renderDashSnapshot(rows) {
+      const el = document.getElementById('dash-snapshot');
+      if (!el) return;
+      if (!rows.length) { el.innerHTML = '<div class="empty-state">No holdings data.</div>'; return; }
+
+      const gains = rows.map(r => parseGainLoss(r.day_gain_loss_pct)).filter(n => n != null);
+      const up    = gains.filter(n => n > 0).length;
+      const down  = gains.filter(n => n < 0).length;
+      const flat  = rows.length - up - down;
+      const avg   = gains.length ? gains.reduce((a, b) => a + b, 0) / gains.length : null;
+
+      const avgStr = avg == null ? '—' : `${avg >= 0 ? '+' : ''}${avg.toFixed(2)}%`;
+      const avgCls = avg == null ? '' : avg > 0 ? ' positive' : avg < 0 ? ' negative' : '';
+
+      el.innerHTML = `
+        <div class="stat-card">
+          <div class="stat-label">POSITIONS</div>
+          <div class="stat-value">${rows.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">DAY AVG CHANGE</div>
+          <div class="stat-value${avgCls}">${avgStr}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">TODAY'S SPLIT</div>
+          <div class="stat-value"><span style="color:var(--primary)">${up}↑</span> / <span style="color:var(--red)">${down}↓</span></div>
+        </div>`;
+    }
+
+    function renderDashMovers(rows) {
+      const el = document.getElementById('dash-movers');
+      if (!el) return;
+
+      const withGain = rows
+        .map(r => ({ ticker: r.ticker, g: parseGainLoss(r.day_gain_loss_pct) }))
+        .filter(r => r.g != null)
+        .sort((a, b) => b.g - a.g);
+
+      if (!withGain.length) { el.innerHTML = '<div class="empty-state">No mover data.</div>'; return; }
+
+      const gainers = withGain.filter(r => r.g > 0).slice(0, 5);
+      const losers  = withGain.filter(r => r.g < 0).slice(-5).reverse();
+
+      const moverRow = (r, pos) => {
+        const sign = r.g > 0 ? '+' : '';
+        const cls  = pos ? 'mover-pct-pos' : 'mover-pct-neg';
+        return `<div class="mover-row"><span class="mover-ticker">${escapeHtml(r.ticker)}</span><span class="${cls}">${sign}${r.g.toFixed(2)}%</span></div>`;
+      };
+      const noData = '<div class="mover-row" style="color:var(--fg-muted);font-size:12px;">None today</div>';
+
+      el.innerHTML = `
+        <div class="movers-card">
+          <div class="movers-card-title gainers">▲ GAINERS</div>
+          ${gainers.length ? gainers.map(r => moverRow(r, true)).join('') : noData}
+        </div>
+        <div class="movers-card">
+          <div class="movers-card-title losers">▼ LOSERS</div>
+          ${losers.length ? losers.map(r => moverRow(r, false)).join('') : noData}
+        </div>`;
+    }
+
+    function renderDashSignals(rows) {
+      const el = document.getElementById('dash-signals');
+      if (!el) return;
+      if (!rows.length) { el.innerHTML = '<div class="empty-state">No signals yet.</div>'; return; }
+
+      const recent = rows.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+      el.innerHTML = recent.map(renderCard).join('');
+    }
+
+    function renderDashTxns(rows) {
+      const el = document.getElementById('dash-txns');
+      if (!el) return;
+      if (!rows.length) { el.innerHTML = '<div class="empty-state">No transactions yet.</div>'; return; }
+
+      const recent = rows.slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
+
+      const typeBadge = type => {
+        const t = (type || '').toLowerCase();
+        if (t === 'buy')  return `<span class="badge badge-bull">BUY</span>`;
+        if (t === 'sell') return `<span class="badge badge-bear">SELL</span>`;
+        return `<span class="badge badge-neu">${escapeHtml(type)}</span>`;
+      };
+
+      el.innerHTML = `
+        <table class="holdings-table">
+          <thead>
+            <tr>
+              <th>DATE</th><th>TICKER</th><th>PRICE</th><th>TYPE</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${recent.map(r => `
+              <tr>
+                <td class="holdings-cost">${escapeHtml(formatDate(r.date))}</td>
+                <td class="holdings-ticker">${escapeHtml(r.ticker)}</td>
+                <td class="holdings-price">${isNaN(parseFloat(r.price)) ? '—' : `$${parseFloat(r.price).toFixed(2)}`}</td>
+                <td>${typeBadge(r.type)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
     function renderWatchlist() { renderStubPage('stocks',    'Watchlist'); }
     function parseGainLoss(val) {
       if (val == null || val === '') return null;
