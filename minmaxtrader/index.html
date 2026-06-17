@@ -232,7 +232,7 @@
     .feed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
     .feed-title { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; }
     .feed-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fg-muted); }
-    .signal-list { display: flex; flex-direction: column; gap: 8px; max-width: 896px; margin: 0 auto; }
+    .signal-list { display: flex; flex-direction: column; gap: 16px; max-width: 896px; margin: 0 auto; }
 
     .card {
       background: var(--card);
@@ -284,7 +284,7 @@
       padding-top: 8px;
       border-top: 1px solid var(--border-half);
     }
-    .level-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--fg-muted); }
+    .level-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fg-muted); }
     .level-value { font-weight: 700; }
     .level-price  .level-value { color: var(--fg); }
     .level-entry  .level-value { color: var(--fg); }
@@ -293,7 +293,9 @@
     .level-upside-pos .level-value { color: var(--primary); }
     .level-upside-neg .level-value { color: var(--red); }
     .level-risk   .level-value { color: var(--red); }
-    .level-ml { margin-left: auto; }
+    .level-risk-pct  { font-size: 12px; font-weight: 700; color: var(--red); }
+    .level-upside-pct-pos { font-size: 12px; font-weight: 700; color: var(--primary); }
+    .level-upside-pct-neg { font-size: 12px; font-weight: 700; color: var(--red); }
 
     .card-link {
       display: inline-flex;
@@ -627,16 +629,13 @@
       let html = '<div class="card-levels">';
       if (price != null) html += `<span class="level-label level-price">PRICE: <span class="level-value">$${price.toFixed(2)}</span></span>`;
       if (e != null) html += `<span class="level-label level-entry">ENTRY: <span class="level-value">$${e.toFixed(2)}</span></span>`;
-      if (s != null) html += `<span class="level-label level-stop">STOP: <span class="level-value">$${s.toFixed(2)}</span></span>`;
-      if (t != null) html += `<span class="level-label level-target">TARGET: <span class="level-value">$${t.toFixed(2)}</span></span>`;
-      if (u != null) {
-        const pct = (u * 100).toFixed(1);
-        const cls = u >= 0 ? 'level-upside-pos' : 'level-upside-neg';
-        html += `<span class="level-label ${cls} level-ml">UPSIDE: <span class="level-value">${u >= 0 ? '+' : ''}${pct}%</span></span>`;
+      if (s != null) {
+        const rSuffix = r != null ? ` <span class="level-risk-pct">(-${(r * 100).toFixed(1)}%)</span>` : '';
+        html += `<span class="level-label level-stop">STOP: <span class="level-value">$${s.toFixed(2)}</span>${rSuffix}</span>`;
       }
-      if (r != null) {
-        const pct = (r * 100).toFixed(1);
-        html += `<span class="level-label level-risk">RISK: <span class="level-value">${pct}%</span></span>`;
+      if (t != null) {
+        const uSuffix = u != null ? ` <span class="${u >= 0 ? 'level-upside-pct-pos' : 'level-upside-pct-neg'}">(${u >= 0 ? '+' : ''}${(u * 100).toFixed(1)}%)</span>` : '';
+        html += `<span class="level-label level-target">TARGET: <span class="level-value">$${t.toFixed(2)}</span>${uSuffix}</span>`;
       }
       return html + '</div>';
     }
