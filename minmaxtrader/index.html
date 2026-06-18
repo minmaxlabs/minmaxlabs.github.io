@@ -231,7 +231,7 @@
     .drawer-nav { flex: 1; padding: 16px 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
 
     /* ── Signal cards ── */
-    .feed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .feed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
     .feed-title { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; }
     .feed-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fg-muted); }
     .signal-list { display: flex; flex-direction: column; gap: 16px; max-width: 896px; margin: 0 auto; }
@@ -815,6 +815,10 @@
     let transactionsSortDir = 'desc';
     let transactionsFilter = '';
 
+    let signalRows = [];
+    let signalFilter = '';
+    let signalSentimentFilter = 'all';
+
     /* ── NAV ITEMS ── */
     const NAV_ITEMS = [
       {
@@ -932,31 +936,77 @@
         <div class="signal-list">
           <div class="feed-header">
             <h1 class="feed-title">Signal Feed</h1>
+            <input class="form-input holdings-search" id="signal-search" type="text" placeholder="search ticker…" autocomplete="off" />
+            <div class="filter-pills">
+              <button class="filter-pill active" data-sentiment="all">ALL</button>
+              <button class="filter-pill" data-sentiment="bullish">BULL</button>
+              <button class="filter-pill" data-sentiment="bearish">BEAR</button>
+            </div>
             <span class="feed-count" id="signal-count">— SIGNALS</span>
           </div>
           <div id="feed" class="card-feed">${[1,2,3,4].map(() => '<div class="skeleton" style="margin-bottom:8px;"></div>').join('')}</div>
         </div>`;
+
+      document.getElementById('signal-search').addEventListener('input', (e) => {
+        signalFilter = e.target.value.trim().toLowerCase();
+        renderSignalFeed();
+      });
+
+      document.querySelectorAll('.filter-pill[data-sentiment]').forEach(pill => {
+        pill.addEventListener('click', () => {
+          signalSentimentFilter = pill.dataset.sentiment;
+          document.querySelectorAll('.filter-pill[data-sentiment]').forEach(p =>
+            p.classList.toggle('active', p.dataset.sentiment === signalSentimentFilter));
+          renderSignalFeed();
+        });
+      });
+
+      signalRows            = [];
+      signalFilter          = '';
+      signalSentimentFilter = 'all';
 
       Papa.parse(CSV_URL, {
         download: true,
         header: true,
         skipEmptyLines: true,
         complete(results) {
-          const rows = results.data.filter(r => r.ticker);
-          document.getElementById('signal-count').textContent = `${rows.length} SIGNALS`;
-          const feed = document.getElementById('feed');
-          if (!rows.length) {
-            feed.innerHTML = '<div class="empty-state">No signals recorded.</div>';
-            return;
-          }
-          const sorted = rows.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
-          feed.innerHTML = sorted.map(renderCard).join('');
+          signalRows = results.data.filter(r => r.ticker)
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+          renderSignalFeed();
         },
         error() {
           document.getElementById('feed').innerHTML =
             '<div class="empty-state">Failed to load signals. Check sheet permissions.</div>';
         },
       });
+    }
+
+    function renderSignalFeed() {
+      const feed  = document.getElementById('feed');
+      const count = document.getElementById('signal-count');
+      if (!feed || !count) return;
+
+      const total = signalRows.length;
+      if (total === 0) {
+        feed.innerHTML = '<div class="empty-state">No signals recorded.</div>';
+        count.textContent = '0 SIGNALS';
+        return;
+      }
+
+      let filtered = signalFilter
+        ? signalRows.filter(r => r.ticker.toLowerCase().includes(signalFilter))
+        : signalRows;
+
+      if (signalSentimentFilter !== 'all') {
+        filtered = filtered.filter(r => (r.sentiment || '').toLowerCase() === signalSentimentFilter);
+      }
+
+      const anyFilter = signalFilter || signalSentimentFilter !== 'all';
+      count.textContent = anyFilter ? `${filtered.length} OF ${total} SIGNALS` : `${total} SIGNALS`;
+
+      feed.innerHTML = filtered.length
+        ? filtered.map(renderCard).join('')
+        : '<div class="empty-state">No matching signals.</div>';
     }
 
     function renderStubPage(path, label) {
