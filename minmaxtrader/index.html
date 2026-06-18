@@ -421,6 +421,23 @@
       min-width: 0;
       max-width: 240px;
     }
+    .filter-pills { display: flex; gap: 4px; flex-shrink: 0; }
+    .filter-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--fg-muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .filter-pill:hover { background: var(--secondary); color: var(--fg); }
+    .filter-pill.active { background: var(--primary-10); border-color: var(--primary-30); color: var(--primary); }
 
     .holdings-table {
       width: 100%;
@@ -809,11 +826,13 @@
     let holdingsSortKey = 'ticker';
     let holdingsSortDir = 'asc';
     let holdingsFilter = '';
+    let holdingsGainFilter = 'all';
 
     let transactionsRows = [];
     let transactionsSortKey = 'date';
     let transactionsSortDir = 'desc';
     let transactionsFilter = '';
+    let transactionsTypeFilter = 'all';
 
     /* ── NAV ITEMS ── */
     const NAV_ITEMS = [
@@ -1303,6 +1322,11 @@
           <div class="holdings-header">
             <h1 class="feed-title">Holdings</h1>
             <input class="form-input holdings-search" id="holdings-search" type="text" placeholder="search ticker…" autocomplete="off" />
+            <div class="filter-pills">
+              <button class="filter-pill active" data-gain="all">ALL</button>
+              <button class="filter-pill" data-gain="gainers">GAINERS</button>
+              <button class="filter-pill" data-gain="losers">LOSERS</button>
+            </div>
             <span class="feed-count holdings-count" id="holdings-count">— POSITIONS</span>
           </div>
           <div id="holdings-body">${[1,2,3,4].map(() => '<div class="skeleton" style="margin-bottom:8px;"></div>').join('')}</div>
@@ -1313,10 +1337,20 @@
         renderHoldingsTable();
       });
 
-      holdingsRows    = [];
-      holdingsSortKey = 'day_gain_loss_pct';
-      holdingsSortDir = 'desc';
-      holdingsFilter  = '';
+      document.querySelectorAll('.filter-pill[data-gain]').forEach(pill => {
+        pill.addEventListener('click', () => {
+          holdingsGainFilter = pill.dataset.gain;
+          document.querySelectorAll('.filter-pill[data-gain]').forEach(p =>
+            p.classList.toggle('active', p.dataset.gain === holdingsGainFilter));
+          renderHoldingsTable();
+        });
+      });
+
+      holdingsRows      = [];
+      holdingsSortKey   = 'day_gain_loss_pct';
+      holdingsSortDir   = 'desc';
+      holdingsFilter    = '';
+      holdingsGainFilter = 'all';
       Papa.parse(HOLDINGS_CSV_URL, {
         download: true,
         header: true,
@@ -1343,11 +1377,18 @@
         return;
       }
 
-      const filtered = holdingsFilter
+      let filtered = holdingsFilter
         ? holdingsRows.filter(r => r.ticker.toLowerCase().includes(holdingsFilter))
         : holdingsRows;
 
-      count.textContent = holdingsFilter
+      if (holdingsGainFilter === 'gainers') {
+        filtered = filtered.filter(r => (parseGainLoss(r.gain_loss_pct) ?? 0) > 0);
+      } else if (holdingsGainFilter === 'losers') {
+        filtered = filtered.filter(r => (parseGainLoss(r.gain_loss_pct) ?? 0) < 0);
+      }
+
+      const anyFilter = holdingsFilter || holdingsGainFilter !== 'all';
+      count.textContent = anyFilter
         ? `${filtered.length} OF ${total} POSITIONS`
         : `${total} POSITIONS`;
 
@@ -1417,6 +1458,11 @@
           <div class="holdings-header">
             <h1 class="feed-title">Transactions</h1>
             <input class="form-input holdings-search" id="txn-search" type="text" placeholder="search ticker…" autocomplete="off" />
+            <div class="filter-pills">
+              <button class="filter-pill active" data-type="all">ALL</button>
+              <button class="filter-pill" data-type="buy">BUY</button>
+              <button class="filter-pill" data-type="sell">SELL</button>
+            </div>
             <span class="feed-count holdings-count" id="txn-count">— TRANSACTIONS</span>
           </div>
           <div id="txn-body">${[1,2,3,4].map(() => '<div class="skeleton" style="margin-bottom:8px;"></div>').join('')}</div>
@@ -1427,10 +1473,20 @@
         renderTransactionsTable();
       });
 
-      transactionsRows    = [];
-      transactionsSortKey = 'date';
-      transactionsSortDir = 'desc';
-      transactionsFilter  = '';
+      document.querySelectorAll('.filter-pill[data-type]').forEach(pill => {
+        pill.addEventListener('click', () => {
+          transactionsTypeFilter = pill.dataset.type;
+          document.querySelectorAll('.filter-pill[data-type]').forEach(p =>
+            p.classList.toggle('active', p.dataset.type === transactionsTypeFilter));
+          renderTransactionsTable();
+        });
+      });
+
+      transactionsRows      = [];
+      transactionsSortKey   = 'date';
+      transactionsSortDir   = 'desc';
+      transactionsFilter    = '';
+      transactionsTypeFilter = 'all';
 
       Papa.parse(TRANSACTIONS_CSV_URL, {
         download: true,
@@ -1458,11 +1514,16 @@
         return;
       }
 
-      const filtered = transactionsFilter
+      let filtered = transactionsFilter
         ? transactionsRows.filter(r => r.ticker.toLowerCase().includes(transactionsFilter))
         : transactionsRows;
 
-      count.textContent = transactionsFilter
+      if (transactionsTypeFilter !== 'all') {
+        filtered = filtered.filter(r => (r.type || '').toLowerCase() === transactionsTypeFilter);
+      }
+
+      const anyFilter = transactionsFilter || transactionsTypeFilter !== 'all';
+      count.textContent = anyFilter
         ? `${filtered.length} OF ${total} TRANSACTIONS`
         : `${total} TRANSACTIONS`;
 
