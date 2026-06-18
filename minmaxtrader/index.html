@@ -235,6 +235,7 @@
     .feed-title { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700; }
     .feed-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fg-muted); }
     .signal-list { display: flex; flex-direction: column; gap: 16px; max-width: 896px; margin: 0 auto; }
+    .card-feed { display: flex; flex-direction: column; gap: 5px; }
 
     .card {
       background: var(--card);
@@ -879,7 +880,7 @@
       const s = formatPrice(row.stop_loss);
       const u = formatPrice(row.upside);
       const r = formatPrice(row.risk);
-      if (price == null && e == null && t == null && s == null) return '';
+      if (price == null && e == null && t == null && s == null && !row.source_url) return '';
       let html = '<div class="card-levels">';
       if (price != null) html += `<span class="level-label level-price">PRICE: <span class="level-value">$${price.toFixed(2)}</span></span>`;
       if (e != null) html += `<span class="level-label level-entry">ENTRY: <span class="level-value">$${e.toFixed(2)}</span></span>`;
@@ -891,6 +892,7 @@
         const uSuffix = u != null ? ` <span class="${u >= 0 ? 'level-upside-pct-pos' : 'level-upside-pct-neg'}">(${u >= 0 ? '+' : ''}${(u * 100).toFixed(1)}%)</span>` : '';
         html += `<span class="level-label level-target">TARGET: <span class="level-value">$${t.toFixed(2)}</span>${uSuffix}</span>`;
       }
+      if (row.source_url) html += `<a class="card-link" href="${escapeHtml(row.source_url)}" target="_blank" rel="noreferrer" style="margin-left:auto;margin-top:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>SOURCE</a>`;
       return html + '</div>';
     }
 
@@ -902,16 +904,13 @@
             <div class="card-left">
               <a class="ticker ticker-link" href="#/stock/${encodeURIComponent(ticker)}">${escapeHtml(ticker)}</a>
               ${sentimentBadge(sentiment)}
+              <a class="source-author ticker-link" href="#/author/${encodeURIComponent(author)}">@${escapeHtml(author)}</a>
+              <span class="source-platform">· ${escapeHtml(source)}</span>
             </div>
             <span class="card-date">${formatDate(date)}</span>
           </div>
-          <div class="card-source">
-            <a class="source-author ticker-link" href="#/author/${encodeURIComponent(author)}">@${escapeHtml(author)}</a>
-            <span class="source-platform">· ${escapeHtml(source)}</span>
-          </div>
           <p class="card-thesis">${escapeHtml(thesis)}</p>
           ${renderLevels(row)}
-          ${source_url ? `<a class="card-link" href="${escapeHtml(source_url)}" target="_blank" rel="noreferrer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>SOURCE</a>` : ''}
         </div>`;
     }
 
@@ -936,7 +935,7 @@
             <h1 class="feed-title">Signal Feed</h1>
             <span class="feed-count" id="signal-count">— SIGNALS</span>
           </div>
-          <div id="feed">${[1,2,3,4].map(() => '<div class="skeleton" style="margin-bottom:8px;"></div>').join('')}</div>
+          <div id="feed" class="card-feed">${[1,2,3,4].map(() => '<div class="skeleton" style="margin-bottom:8px;"></div>').join('')}</div>
         </div>`;
 
       Papa.parse(CSV_URL, {
