@@ -421,6 +421,24 @@
       min-width: 0;
       max-width: 240px;
     }
+    .filter-pills { display: flex; flex-shrink: 0; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+    .filter-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 8px 12px;
+      border: none;
+      border-right: 1px solid var(--border);
+      background: var(--secondary);
+      color: var(--fg-muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .filter-pill:last-child { border-right: none; }
+    .filter-pill:hover { background: var(--card); color: var(--fg); }
+    .filter-pill.active { background: var(--primary-10); color: var(--primary); }
 
     .holdings-table {
       width: 100%;
