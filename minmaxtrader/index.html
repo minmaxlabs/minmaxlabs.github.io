@@ -573,9 +573,54 @@
     }
     .stock-back-btn:hover { color: var(--fg); border-color: var(--fg-muted); }
     .stock-ticker-heading { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700; color: var(--primary); }
-    .stock-chart-container {
+    .stock-chart-card {
       background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-      overflow: hidden; height: 460px; margin-bottom: 28px;
+      overflow: hidden; margin-bottom: 28px;
+    }
+    .stock-chart-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border-half);
+      flex-wrap: wrap;
+    }
+    .stock-quote {
+      display: flex; align-items: baseline; gap: 10px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .stock-quote-price { font-size: 18px; font-weight: 700; color: var(--fg); }
+    .stock-quote-change { font-size: 13px; font-weight: 600; }
+    .stock-quote-change.pos { color: var(--primary); }
+    .stock-quote-change.neg { color: var(--red); }
+    .stock-quote-muted { font-size: 11px; color: var(--fg-muted); }
+    .tf-group { display: flex; gap: 4px; }
+    .tf-btn {
+      background: none; border: 1px solid var(--border); border-radius: 4px;
+      color: var(--fg-muted); font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+      padding: 4px 10px; cursor: pointer; transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .tf-btn:hover:not(:disabled) { color: var(--fg); border-color: var(--fg-muted); }
+    .tf-btn.active {
+      color: var(--primary); border-color: var(--primary-30); background: var(--primary-10);
+    }
+    .stock-chart-container {
+      position: relative; height: 720px; width: 100%;
+    }
+    .stock-chart-status {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--fg-muted);
+      text-align: center; padding: 16px; pointer-events: none;
+    }
+    .stock-chart-status.error { color: var(--red); }
+    .pane-legend {
+      position: absolute; top: 4px; left: 8px; z-index: 3;
+      display: flex; flex-wrap: wrap; gap: 2px 10px;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.06em; color: var(--fg-muted);
+      pointer-events: none;
+    }
+    .pane-legend .legend-item { display: inline-flex; align-items: center; gap: 5px; }
+    .pane-legend .legend-swatch {
+      display: inline-block; width: 12px; height: 2px; border-radius: 1px;
     }
     .stock-signals-header {
       font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
@@ -737,6 +782,7 @@
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
   <script>
     /* ── AUTH CONFIG ── */
     // Create a Client ID at: https://console.cloud.google.com/apis/credentials
@@ -822,6 +868,11 @@
     const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
     const HOLDINGS_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Holdings`;
     const TRANSACTIONS_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Transactions`;
+
+    // Polygon supplies daily OHLCV for the chart; Finnhub supplies the realtime quote header.
+    // Domain-restrict these keys in each provider's dashboard before deploying.
+    const POLYGON_API_KEY = 'XUx2WtfT6M7rXpTKjmKFFIKmn4NPHG1b';
+    const FINNHUB_API_KEY = 'd8qalf1r01qr03ngkgdgd8qalf1r01qr03ngkge0';
 
     let holdingsRows = [];
     let holdingsSortKey = 'ticker';
@@ -1193,11 +1244,22 @@
     }
 
     /* ── STOCK DETAIL ── */
-    let _tvScriptEl = null;
+    const GRANULARITIES = [
+      { key: 'D', label: 'D' },
+      { key: 'W', label: 'W' },
+      { key: 'M', label: 'M' },
+    ];
+    const VISIBLE_DAYS = 93; // hardcoded 3-month visible range
+    const DEFAULT_GRANULARITY = 'D';
+    const POLYGON_HISTORY_DAYS = 740; // need ~2y for SMA(200) lookback even when visible window is short
+    const candleCache = new Map(); // ticker -> { fetchedAt, candles }
+    let _chartInstance = null;
+    let _chartResizeObserver = null;
+    let _chartTicker = null;
+    let _currentGranularity = DEFAULT_GRANULARITY;
 
     function renderStock(ticker) {
       const safeTicker = escapeHtml(ticker);
-      const chartId = 'tv-chart-' + ticker.replace(/[^A-Za-z0-9]/g, '_');
 
       document.getElementById('page').innerHTML = `
         <div class="stock-page">
@@ -1209,7 +1271,21 @@
             </button>
             <span class="stock-ticker-heading">${safeTicker}</span>
           </div>
-          <div class="stock-chart-container" id="${chartId}"></div>
+          <div class="stock-chart-card">
+            <div class="stock-chart-toolbar">
+              <div class="stock-quote" id="stock-quote">
+                <span class="stock-quote-muted">Loading quote…</span>
+              </div>
+              <div class="tf-group" id="gr-group">
+                ${GRANULARITIES.map(g => `
+                  <button class="tf-btn${g.key === DEFAULT_GRANULARITY ? ' active' : ''}" data-gr="${g.key}">${g.label}</button>
+                `).join('')}
+              </div>
+            </div>
+            <div class="stock-chart-container" id="stock-chart">
+              <div class="stock-chart-status" id="stock-chart-status">Loading chart…</div>
+            </div>
+          </div>
           <div class="stock-signals-header">SIGNALS FOR ${safeTicker}</div>
           <div id="stock-signals-list">
             ${[1,2,3].map(() => '<div class="skeleton" style="margin-bottom:8px;height:88px;"></div>').join('')}
@@ -1220,7 +1296,18 @@
         if (history.length > 1) history.back(); else navigate('#/signals');
       });
 
-      _injectTradingViewWidget(chartId, ticker);
+      document.querySelectorAll('#gr-group .tf-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          _currentGranularity = btn.dataset.gr;
+          document.querySelectorAll('#gr-group .tf-btn').forEach(b => b.classList.toggle('active', b === btn));
+          renderCustomChart(ticker, _currentGranularity);
+        });
+      });
+
+      _chartTicker = ticker;
+      _currentGranularity = DEFAULT_GRANULARITY;
+      renderCustomChart(ticker, _currentGranularity);
+      fetchAndRenderQuote(ticker);
 
       Papa.parse(CSV_URL, {
         download: true, header: true, skipEmptyLines: true,
@@ -1241,29 +1328,286 @@
       });
     }
 
-    function _injectTradingViewWidget(containerId, ticker) {
-      if (_tvScriptEl && _tvScriptEl.parentNode) {
-        _tvScriptEl.parentNode.removeChild(_tvScriptEl);
-        _tvScriptEl = null;
+    // Roll a daily OHLCV series into weekly or monthly bars (W = ISO week, M = calendar month).
+    // Each bar takes open/close from the first/last day, high=max, low=min, volume=sum.
+    function aggregateCandles(candles, granularity) {
+      if (granularity === 'D' || !candles.length) return candles;
+      const bucketKey = granularity === 'W'
+        ? (d) => {
+            // ISO week — start of week Monday in UTC.
+            const day = d.getUTCDay() || 7; // Sun=7
+            const mon = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - (day - 1)));
+            return mon.toISOString().slice(0, 10);
+          }
+        : (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+
+      const buckets = new Map();
+      for (const c of candles) {
+        const d = new Date(c.time * 1000);
+        const k = bucketKey(d);
+        const b = buckets.get(k);
+        if (!b) {
+          buckets.set(k, { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume });
+        } else {
+          b.high = Math.max(b.high, c.high);
+          b.low = Math.min(b.low, c.low);
+          b.close = c.close;
+          b.volume += c.volume;
+        }
       }
-      const initWidget = () => {
-        if (!document.getElementById(containerId)) return;
-        new TradingView.widget({ // eslint-disable-line no-undef
-          container_id: containerId, symbol: ticker,
-          interval: 'D', timezone: 'America/New_York',
-          theme: 'dark', style: '1', locale: 'en',
-          toolbar_bg: '#0a0c16',
-          enable_publishing: false, hide_side_toolbar: false,
-          allow_symbol_change: true, width: '100%', height: 460, autosize: false,
-        });
-      };
-      const script = document.createElement('script');
-      script.src = 'https://s3.tradingview.com/tv.js';
-      script.async = true;
-      script.onload = initWidget;
-      document.body.appendChild(script);
-      _tvScriptEl = script;
-      if (window.TradingView) initWidget();
+      return Array.from(buckets.values()).sort((a, b) => a.time - b.time);
+    }
+
+    /* ── Chart: data fetch ── */
+    async function fetchPolygonCandles(ticker) {
+      const cached = candleCache.get(ticker);
+      // Cache for 10 minutes to keep us well under Polygon's 5 req/min free-tier ceiling.
+      if (cached && Date.now() - cached.fetchedAt < 10 * 60 * 1000) return cached.candles;
+
+      const to = new Date();
+      const from = new Date(to.getTime() - POLYGON_HISTORY_DAYS * 86400 * 1000);
+      const fmt = d => d.toISOString().slice(0, 10);
+      const url = `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker.toUpperCase())}` +
+        `/range/1/day/${fmt(from)}/${fmt(to)}?adjusted=true&sort=asc&limit=5000&apiKey=${POLYGON_API_KEY}`;
+
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => '');
+        throw new Error(`Polygon ${resp.status}: ${body.slice(0, 160) || resp.statusText}`);
+      }
+      const json = await resp.json();
+      if (!json.results || !json.results.length) throw new Error('No candles returned');
+
+      const candles = json.results.map(b => ({
+        time: Math.floor(b.t / 1000), // UNIX seconds for Lightweight Charts
+        open: b.o, high: b.h, low: b.l, close: b.c, volume: b.v,
+      }));
+      candleCache.set(ticker, { fetchedAt: Date.now(), candles });
+      return candles;
+    }
+
+    async function fetchAndRenderQuote(ticker) {
+      const el = document.getElementById('stock-quote');
+      if (!el) return;
+      try {
+        const resp = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(ticker.toUpperCase())}&token=${FINNHUB_API_KEY}`);
+        if (!resp.ok) throw new Error(`Finnhub ${resp.status}`);
+        const q = await resp.json();
+        if (typeof q.c !== 'number' || q.c === 0) throw new Error('No quote');
+        const change = q.d, pct = q.dp;
+        const sign = change >= 0 ? '+' : '';
+        const cls = change >= 0 ? 'pos' : 'neg';
+        el.innerHTML = `
+          <span class="stock-quote-price">$${q.c.toFixed(2)}</span>
+          <span class="stock-quote-change ${cls}">${sign}${change.toFixed(2)} (${sign}${pct.toFixed(2)}%)</span>
+          <span class="stock-quote-muted">prev $${q.pc.toFixed(2)}</span>`;
+      } catch {
+        el.innerHTML = '<span class="stock-quote-muted">Quote unavailable</span>';
+      }
+    }
+
+    /* ── Chart: indicators ── */
+    function computeSMA(values, period) {
+      const out = new Array(values.length).fill(null);
+      if (values.length < period) return out;
+      let sum = 0;
+      for (let i = 0; i < period; i++) sum += values[i];
+      out[period - 1] = sum / period;
+      for (let i = period; i < values.length; i++) {
+        sum += values[i] - values[i - period];
+        out[i] = sum / period;
+      }
+      return out;
+    }
+
+    function computeEMA(values, period) {
+      const out = new Array(values.length).fill(null);
+      if (values.length < period) return out;
+      const k = 2 / (period + 1);
+      let sum = 0;
+      for (let i = 0; i < period; i++) sum += values[i];
+      let ema = sum / period;
+      out[period - 1] = ema;
+      for (let i = period; i < values.length; i++) {
+        ema = values[i] * k + ema * (1 - k);
+        out[i] = ema;
+      }
+      return out;
+    }
+
+    function computeMACD(closes, fast = 12, slow = 26, signal = 9) {
+      const emaFast = computeEMA(closes, fast);
+      const emaSlow = computeEMA(closes, slow);
+      const macd = closes.map((_, i) =>
+        emaFast[i] != null && emaSlow[i] != null ? emaFast[i] - emaSlow[i] : null
+      );
+      // Signal = EMA(signal) of the non-null MACD values.
+      const macdDefined = macd.filter(v => v != null);
+      const signalDefined = computeEMA(macdDefined, signal);
+      const offset = macd.findIndex(v => v != null);
+      const signalLine = new Array(macd.length).fill(null);
+      if (offset >= 0) {
+        for (let i = 0; i < signalDefined.length; i++) {
+          if (signalDefined[i] != null) signalLine[offset + i] = signalDefined[i];
+        }
+      }
+      const hist = macd.map((v, i) => (v != null && signalLine[i] != null ? v - signalLine[i] : null));
+      return { macd, signal: signalLine, hist };
+    }
+
+    function computeOBV(candles) {
+      const out = new Array(candles.length).fill(0);
+      for (let i = 1; i < candles.length; i++) {
+        const prev = out[i - 1];
+        if (candles[i].close > candles[i - 1].close) out[i] = prev + candles[i].volume;
+        else if (candles[i].close < candles[i - 1].close) out[i] = prev - candles[i].volume;
+        else out[i] = prev;
+      }
+      return out;
+    }
+
+    /* ── Chart: render ── */
+    function disposeChart() {
+      if (_chartResizeObserver) { _chartResizeObserver.disconnect(); _chartResizeObserver = null; }
+      if (_chartInstance) { try { _chartInstance.remove(); } catch {} _chartInstance = null; }
+    }
+
+    function setChartStatus(text, isError) {
+      const status = document.getElementById('stock-chart-status');
+      if (!status) return;
+      status.textContent = text || '';
+      status.style.display = text ? 'flex' : 'none';
+      status.classList.toggle('error', !!isError);
+    }
+
+    async function renderCustomChart(ticker, grKey) {
+      const container = document.getElementById('stock-chart');
+      if (!container || _chartTicker !== ticker) return;
+
+      disposeChart();
+      setChartStatus('Loading chart…', false);
+
+      let rawCandles;
+      try {
+        rawCandles = await fetchPolygonCandles(ticker);
+      } catch (err) {
+        if (_chartTicker === ticker) setChartStatus(`Chart unavailable — ${err.message}`, true);
+        return;
+      }
+      if (_chartTicker !== ticker) return;
+      if (!rawCandles.length) { setChartStatus('No data for this ticker.', true); return; }
+
+      const candles = aggregateCandles(rawCandles, grKey || DEFAULT_GRANULARITY);
+      // SMA(200) needs 200 prior bars, so always compute indicators against the full history
+      // and only restrict the visible time range to the last VISIBLE_DAYS.
+      const closes = candles.map(c => c.close);
+      const sma9 = computeSMA(closes, 9);
+      const sma50 = computeSMA(closes, 50);
+      const sma200 = computeSMA(closes, 200);
+      const macd = computeMACD(closes);
+      const obv = computeOBV(candles);
+
+      const toLine = arr => candles
+        .map((c, i) => (arr[i] != null ? { time: c.time, value: arr[i] } : null))
+        .filter(Boolean);
+      const candleData = candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
+      const volumeData = candles.map(c => ({
+        time: c.time, value: c.volume,
+        color: c.close >= c.open ? 'rgba(0, 230, 230, 0.55)' : 'rgba(239, 68, 68, 0.55)',
+      }));
+      const histData = candles.map((c, i) => ({
+        time: c.time,
+        value: macd.hist[i] ?? 0,
+        color: (macd.hist[i] ?? 0) >= 0 ? 'rgba(0, 230, 230, 0.6)' : 'rgba(239, 68, 68, 0.6)',
+      }));
+      const obvData = candles.map((c, i) => ({ time: c.time, value: obv[i] }));
+
+      const chart = LightweightCharts.createChart(container, {
+        layout: { background: { color: 'transparent' }, textColor: '#94a3b8', panes: { separatorColor: 'rgba(148,163,184,0.18)', separatorHoverColor: 'rgba(148,163,184,0.35)' } },
+        grid: { vertLines: { color: 'rgba(148,163,184,0.08)' }, horzLines: { color: 'rgba(148,163,184,0.08)' } },
+        rightPriceScale: { borderColor: 'rgba(148,163,184,0.15)' },
+        timeScale: { borderColor: 'rgba(148,163,184,0.15)', timeVisible: false, secondsVisible: false },
+        crosshair: { mode: 1 },
+        autoSize: true,
+      });
+      _chartInstance = chart;
+
+      // Pane 0 — price + SMAs
+      const candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
+        upColor: '#00e6e6', downColor: '#ef4444',
+        borderUpColor: '#00e6e6', borderDownColor: '#ef4444',
+        wickUpColor: '#00e6e6', wickDownColor: '#ef4444',
+      }, 0);
+      candleSeries.setData(candleData);
+
+      const sma9Series  = chart.addSeries(LightweightCharts.LineSeries, { color: '#f59e0b', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }, 0);
+      const sma50Series = chart.addSeries(LightweightCharts.LineSeries, { color: '#a855f7', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }, 0);
+      const sma200Series= chart.addSeries(LightweightCharts.LineSeries, { color: '#38bdf8', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }, 0);
+      sma9Series.setData(toLine(sma9));
+      sma50Series.setData(toLine(sma50));
+      sma200Series.setData(toLine(sma200));
+
+      // Pane 1 — volume
+      const volSeries = chart.addSeries(LightweightCharts.HistogramSeries, {
+        priceFormat: { type: 'volume' }, priceLineVisible: false, lastValueVisible: false,
+      }, 1);
+      volSeries.setData(volumeData);
+
+      // Pane 2 — MACD
+      const macdSeries   = chart.addSeries(LightweightCharts.LineSeries,      { color: '#00e6e6', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }, 2);
+      const signalSeries = chart.addSeries(LightweightCharts.LineSeries,      { color: '#f59e0b', lineWidth: 1, priceLineVisible: false, lastValueVisible: false }, 2);
+      const histSeries   = chart.addSeries(LightweightCharts.HistogramSeries, { priceLineVisible: false, lastValueVisible: false }, 2);
+      macdSeries.setData(toLine(macd.macd));
+      signalSeries.setData(toLine(macd.signal));
+      histSeries.setData(histData);
+
+      // Pane 3 — OBV
+      const obvSeries = chart.addSeries(LightweightCharts.LineSeries, {
+        color: '#a855f7', lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
+      }, 3);
+      obvSeries.setData(obvData);
+
+      // Pane heights in pixels — must sum to a bit less than container height (720px)
+      // to leave room for the time axis. Indicators set last so the main pane settles.
+      const panes = chart.panes();
+      if (panes[1]) panes[1].setHeight(85);
+      if (panes[2]) panes[2].setHeight(115);
+      if (panes[3]) panes[3].setHeight(115);
+      if (panes[0]) panes[0].setHeight(360);
+
+      const paneLegends = [
+        [
+          { color: '#00e6e6', label: 'PRICE' },
+          { color: '#f59e0b', label: 'SMA 9' },
+          { color: '#a855f7', label: 'SMA 50' },
+          { color: '#38bdf8', label: 'SMA 200' },
+        ],
+        [{ color: 'rgba(0,230,230,0.55)', label: 'VOLUME' }],
+        [
+          { color: '#00e6e6', label: 'MACD' },
+          { color: '#f59e0b', label: 'SIGNAL' },
+          { color: 'rgba(0,230,230,0.6)', label: 'HIST' },
+        ],
+        [{ color: '#a855f7', label: 'OBV' }],
+      ];
+      paneLegends.forEach((items, i) => {
+        const pane = panes[i];
+        if (!pane) return;
+        const el = pane.getHTMLElement();
+        if (!el) return;
+        const legend = document.createElement('div');
+        legend.className = 'pane-legend';
+        legend.innerHTML = items
+          .map(it => `<span class="legend-item"><span class="legend-swatch" style="background:${it.color}"></span>${it.label}</span>`)
+          .join('');
+        el.appendChild(legend);
+      });
+
+      const lastTime = candles[candles.length - 1].time;
+      const fromTime = lastTime - VISIBLE_DAYS * 86400;
+      chart.timeScale().setVisibleRange({ from: fromTime, to: lastTime });
+
+      setChartStatus('', false);
     }
 
     /* ── AUTHOR DETAIL ── */
