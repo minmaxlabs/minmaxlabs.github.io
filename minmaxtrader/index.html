@@ -278,6 +278,25 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
+    .card-thesis.expanded {
+      display: block;
+      -webkit-line-clamp: unset;
+      overflow: visible;
+    }
+    .card-thesis-toggle {
+      background: none;
+      border: none;
+      padding: 0;
+      margin-top: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--accent);
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .card-thesis-toggle:hover { text-decoration: underline; }
+    .card-thesis-toggle[hidden] { display: none; }
     .card-levels {
       display: flex;
       align-items: center;
@@ -982,9 +1001,40 @@
             <span class="card-date">${formatDate(date)}</span>
           </div>
           <p class="card-thesis">${escapeHtml(thesis)}</p>
+          <button type="button" class="card-thesis-toggle" hidden>show more</button>
           ${renderLevels(row)}
         </div>`;
     }
+
+    function applyThesisToggles(root) {
+      const scope = root || document;
+      scope.querySelectorAll('.card').forEach(card => {
+        const p   = card.querySelector('.card-thesis');
+        const btn = card.querySelector('.card-thesis-toggle');
+        if (!p || !btn) return;
+        const wasExpanded = p.classList.contains('expanded');
+        if (wasExpanded) p.classList.remove('expanded');
+        const overflowing = p.scrollHeight > p.clientHeight + 1;
+        if (wasExpanded && overflowing) p.classList.add('expanded');
+        btn.hidden = !overflowing;
+        btn.textContent = p.classList.contains('expanded') ? 'show less' : 'show more';
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.card-thesis-toggle');
+      if (!btn) return;
+      const p = btn.parentElement && btn.parentElement.querySelector('.card-thesis');
+      if (!p) return;
+      const expanded = p.classList.toggle('expanded');
+      btn.textContent = expanded ? 'show less' : 'show more';
+    });
+
+    let thesisResizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(thesisResizeTimer);
+      thesisResizeTimer = setTimeout(() => applyThesisToggles(), 150);
+    });
 
     /* ── CSV HELPER ── */
     function fetchCsv(url) {
@@ -1076,6 +1126,7 @@
       feed.innerHTML = filtered.length
         ? filtered.map(renderCard).join('')
         : '<div class="empty-state">No matching signals.</div>';
+      applyThesisToggles(feed);
     }
 
     function renderStubPage(path, label) {
@@ -1208,6 +1259,7 @@
 
       const recent = rows.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
       el.innerHTML = recent.map(renderCard).join('');
+      applyThesisToggles(el);
     }
 
     function renderDashTxns(rows) {
@@ -1320,6 +1372,7 @@
           el.innerHTML = rows.length
             ? rows.map(renderCard).join('')
             : `<div class="empty-state">No signals recorded for ${safeTicker}.</div>`;
+          applyThesisToggles(el);
         },
         error() {
           const el = document.getElementById('stock-signals-list');
@@ -1645,6 +1698,7 @@
           el.innerHTML = rows.length
             ? rows.map(renderCard).join('')
             : `<div class="empty-state">No signals from @${safeAuthor}.</div>`;
+          applyThesisToggles(el);
         },
         error() {
           const el = document.getElementById('author-signals-list');
